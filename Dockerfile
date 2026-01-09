@@ -2,7 +2,7 @@
 
 # --- Stage 1: Build ffmpeg (audio-only minimal) ---
 # Must build on target platform since FFmpeg can't easily cross-compile
-FROM --platform=${BUILDPLATFORM} alpine:latest AS ffmpeg-builder
+FROM --platform=${TARGETPLATFORM} alpine:latest AS ffmpeg-builder
 ARG TARGETPLATFORM
 ARG TARGETOS
 ARG TARGETARCH
@@ -87,10 +87,10 @@ WORKDIR /app
 COPY main.go .
 RUN --mount=type=cache,target=/root/.cache/go-build \
   --mount=type=cache,target=/go/pkg/mod \
-  CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags='-s -w' -o /out/server main.go
+  CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -ldflags='-s -w' -o /out/server main.go
 
 # --- Stage 3: Runtime image ---
-FROM --platform=${BUILDPLATFORM} scratch
+FROM --platform=${TARGETPLATFORM} scratch
 ARG TARGETPLATFORM
 ARG TARGETOS
 ARG TARGETARCH
