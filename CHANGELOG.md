@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.1.0](https://github.com/Fields-Education/audio-extractor/compare/v1.0.1...v1.1.0) (2026-01-29)
+
+
+### Features
+
+* add automated Docker multi-arch builds with ECR push ([0a818b3](https://github.com/Fields-Education/audio-extractor/commit/0a818b3c93a69b78b2d37c7cd841f35a6025c4c4))
+* support PORT environment variable ([1bbf15d](https://github.com/Fields-Education/audio-extractor/commit/1bbf15dd112ed4a3ee3c5597f511480143303427))
+
+
+### Bug Fixes
+
+* use Blacksmith native runners for faster Linux builds ([0e5f20a](https://github.com/Fields-Education/audio-extractor/commit/0e5f20ac4ccba55e09b4e9f9f684f5adf42be32c))
+
 ## [1.0.1](https://github.com/Fields-Education/audio-extractor/compare/v1.0.0...v1.0.1) (2026-01-29)
 
 
