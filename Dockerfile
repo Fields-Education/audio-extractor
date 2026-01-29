@@ -78,16 +78,17 @@ RUN strip ${PREFIX}/bin/ffmpeg || true
 RUN rm -rf ${PREFIX}/share ${PREFIX}/include ${PREFIX}/lib
 
 # --- Stage 2: Build Go server ---
-FROM --platform=${BUILDPLATFORM} golang:1.25.3-alpine3.22 AS go-builder
+FROM --platform=${BUILDPLATFORM} golang:1.25.6-alpine3.22 AS go-builder
 ARG TARGETPLATFORM
 ARG TARGETOS
 ARG TARGETARCH
 ARG BUILDPLATFORM
 WORKDIR /app
-COPY main.go .
+COPY go.mod .
+COPY main.go ffmpeg_docker.go ./
 RUN --mount=type=cache,target=/root/.cache/go-build \
   --mount=type=cache,target=/go/pkg/mod \
-  CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -ldflags='-s -w' -o /out/server main.go
+  CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -tags docker -trimpath -ldflags='-s -w' -o /out/server .
 
 # --- Stage 3: Runtime image ---
 FROM --platform=${TARGETPLATFORM} scratch

@@ -1,0 +1,105 @@
+name: Release Please
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          release-type: go
+
+  build-release:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            platform: linux-x64
+          - goos: linux
+            goarch: arm64
+            platform: linux-arm64
+          - goos: darwin
+            goarch: arm64
+            platform: macos-arm64
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.6'
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build ffmpeg for ${{ matrix.goos }}/${{ matrix.goarch }}
+        run: |
+          mkdir -p embed/ffmpeg
+          docker buildx build \
+            --platform "${{ matrix.goos }}/${{ matrix.goarch }}" \
+            --target ffmpeg-builder \
+            --output "type=local,dest=.tmp-ffmpeg" \
+            --build-arg FFMPEG_VERSION=8.0 \
+            -f Dockerfile \
+            .
+          cp .tmp-ffmpeg/opt/ffmpeg/bin/ffmpeg "embed/ffmpeg/ffmpeg_${{ matrix.goos }}_${{ matrix.goarch }}"
+          rm -rf .tmp-ffmpeg
+
+      - name: Build Go binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        run: |
+          go build -trimpath -ldflags='-s -w' -o "audio-extractor" .
+
+      - name: Create release archive
+        run: |
+          # mise expects: {tool}_{version}_{platform}.tar.gz
+          # Platform naming: linux-x64, linux-arm64, macos-arm64
+          ARCHIVE_NAME="audio-extractor_${{ needs.release-please.outputs.version }}_${{ matrix.platform }}.tar.gz"
+          tar -czvf "${ARCHIVE_NAME}" audio-extractor
+          echo "ARCHIVE_NAME=${ARCHIVE_NAME}" >> $GITHUB_ENV
+
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: audio-extractor-${{ matrix.platform }}
+          path: ${{ env.ARCHIVE_NAME }}
+
+  upload-release-assets:
+    needs: [release-please, build-release]
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Upload release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for dir in artifacts/*/; do
+            for file in "$dir"*; do
+              gh release upload "${{ needs.release-please.outputs.tag_name }}" "$file" --repo ${{ github.repository }}
+            done
+          done

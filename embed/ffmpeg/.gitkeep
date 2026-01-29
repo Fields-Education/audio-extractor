@@ -1,0 +1,5 @@
+# Placeholder - ffmpeg binaries are built and placed here
+# Expected files:
+#   ffmpeg_linux_amd64
+#   ffmpeg_linux_arm64
+#   ffmpeg_darwin_arm64

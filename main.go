@@ -12,6 +12,9 @@ import (
 	"time"
 )
 
+// ffmpegPath is set by init() in either ffmpeg_embedded.go or ffmpeg_docker.go
+var ffmpegPath string
+
 const (
 	FilterHighpass           = 1 << 0 // 1   - Remove low-frequency rumble
 	FilterLowpass            = 1 << 1 // 2   - Remove high-frequency noise
@@ -84,7 +87,7 @@ func convertToWavPcm16WithCleanup(r io.Reader, filterMask int) ([]byte, error) {
 		"pipe:1",
 	)
 
-	cmd := exec.Command("ffmpeg", args...)
+	cmd := exec.Command(ffmpegPath, args...)
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -128,7 +131,7 @@ func convertToMp3WithCleanup(r io.Reader, filterMask int) ([]byte, error) {
 		"pipe:1",
 	)
 
-	cmd := exec.Command("ffmpeg", args...)
+	cmd := exec.Command(ffmpegPath, args...)
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &out
@@ -170,7 +173,7 @@ func convertToFlacWithCleanup(r io.Reader, filterMask int) ([]byte, error) {
 		"pipe:1",
 	)
 
-	cmd := exec.Command("ffmpeg", args...)
+	cmd := exec.Command(ffmpegPath, args...)
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &out

@@ -1,0 +1,13 @@
+# Ignore standalone build artifacts
+dist/
+embed/
+.tmp-ffmpeg-*
+
+# Ignore git
+.git/
+
+# Ignore build script (not needed in Docker)
+build-standalone.sh
+
+# Ignore embedded ffmpeg source (Docker builds its own)
+ffmpeg_embedded.go
