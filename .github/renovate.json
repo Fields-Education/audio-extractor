@@ -61,39 +61,5 @@
       "datasourceTemplate": "docker"
     }
   ],
-  "packageRules": [
-    {
-      "matchDepNames": ["FFmpeg/FFmpeg"],
-      "groupName": "ffmpeg (non-major)",
-      "matchUpdateTypes": ["minor", "patch"],
-      "commitMessageTopic": "ffmpeg"
-    },
-    {
-      "matchDepNames": ["FFmpeg/FFmpeg"],
-      "matchUpdateTypes": ["major"],
-      "commitMessageTopic": "ffmpeg"
-    },
-    {
-      "matchDepNames": ["golang"],
-      "groupName": "golang (non-major)",
-      "matchUpdateTypes": ["minor", "patch"],
-      "commitMessageTopic": "Go"
-    },
-    {
-      "matchDepNames": ["golang"],
-      "matchUpdateTypes": ["major"],
-      "commitMessageTopic": "Go"
-    },
-    {
-      "matchManagers": ["github-actions"],
-      "groupName": "github-actions (non-major)",
-      "matchUpdateTypes": ["minor", "patch"],
-      "commitMessageTopic": "GitHub Actions"
-    },
-    {
-      "matchManagers": ["github-actions"],
-      "matchUpdateTypes": ["major"],
-      "commitMessageTopic": "GitHub Actions"
-    }
-  ]
+  "packageRules": []
 }
