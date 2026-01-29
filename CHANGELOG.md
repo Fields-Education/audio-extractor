@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.5.0](https://github.com/Fields-Education/audio-extractor/compare/v1.4.0...v1.5.0) (2026-01-29)
+
+
+### Features
+
+* add --version and --verbose flags, fix build script path handling ([f348140](https://github.com/Fields-Education/audio-extractor/commit/f34814010305810ee2b2a7e451b5cfc38b904dcb))
+
+
+### Bug Fixes
+
+* use temp file for ffmpeg input to support MP4/MOV files ([bd79ed9](https://github.com/Fields-Education/audio-extractor/commit/bd79ed9744b95be1dfc0fc872bfb1ec92e8692a6))
+
 ## [1.4.0](https://github.com/Fields-Education/audio-extractor/compare/v1.3.0...v1.4.0) (2026-01-29)
 
 
