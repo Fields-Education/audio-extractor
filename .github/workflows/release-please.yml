@@ -39,7 +39,7 @@ jobs:
 
       - name: Cache ffmpeg source
         id: cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ffmpeg.tar.xz
           key: ffmpeg-source-${{ env.FFMPEG_VERSION }}
@@ -201,7 +201,7 @@ jobs:
           brew install nasm pkg-config ccache lame
 
       - name: Cache ccache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/Library/Caches/ccache
           key: ccache-macos-arm64-${{ env.FFMPEG_VERSION }}
