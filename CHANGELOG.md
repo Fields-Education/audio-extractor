@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/Fields-Education/audio-extractor/compare/v1.1.1...v1.2.0) (2026-01-29)
+
+
+### Features
+
+* add ccache for faster ffmpeg compilation ([bc5b13c](https://github.com/Fields-Education/audio-extractor/commit/bc5b13ce07a377ea0f77efd9daa818a4435003eb))
+
 ## [1.1.1](https://github.com/Fields-Education/audio-extractor/compare/v1.1.0...v1.1.1) (2026-01-29)
 
 
