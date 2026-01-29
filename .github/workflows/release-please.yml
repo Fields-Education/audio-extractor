@@ -28,6 +28,7 @@ jobs:
         id: release
         with:
           release-type: go
+          prerelease: true
 
   download-ffmpeg:
     needs: release-please
@@ -382,3 +383,14 @@ jobs:
           docker manifest annotate public.ecr.aws/m2l9b6l8/audio-extractor:latest \
             public.ecr.aws/m2l9b6l8/audio-extractor:latest-arm64 --arch arm64
           docker manifest push public.ecr.aws/m2l9b6l8/audio-extractor:latest
+
+  publish-release:
+    needs: [release-please, upload-release-assets, docker-merge-manifest]
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release edit "${{ needs.release-please.outputs.tag_name }}" --repo ${{ github.repository }} --prerelease=false --latest
