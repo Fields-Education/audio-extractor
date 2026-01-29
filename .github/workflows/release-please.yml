@@ -32,6 +32,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Mount ccache sticky disk
+        uses: useblacksmith/stickydisk@v1
+        with:
+          key: ccache-linux-amd64-${{ env.FFMPEG_VERSION }}
+          path: ~/.ccache
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
@@ -40,7 +46,13 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y nasm yasm pkg-config
+          sudo apt-get install -y nasm yasm pkg-config ccache
+
+      - name: Configure ccache
+        run: |
+          ccache --set-config=max_size=500M
+          ccache --set-config=compression=true
+          ccache -z
 
       - name: Build ffmpeg from source
         run: |
@@ -95,10 +107,14 @@ jobs:
             --enable-parser=opus \
             --enable-parser=flac \
             --prefix="$(pwd)/out" \
-            --extra-ldflags="-static"
+            --extra-ldflags="-static" \
+            --cc="ccache gcc"
           make -j$(nproc)
           cp ffmpeg ../embed/ffmpeg/ffmpeg_linux_amd64
           strip ../embed/ffmpeg/ffmpeg_linux_amd64 || true
+
+      - name: Show ccache stats
+        run: ccache -s
 
       - name: Build Go binary
         env:
@@ -129,6 +145,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Mount ccache sticky disk
+        uses: useblacksmith/stickydisk@v1
+        with:
+          key: ccache-linux-arm64-${{ env.FFMPEG_VERSION }}
+          path: ~/.ccache
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
@@ -137,7 +159,13 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y nasm yasm pkg-config
+          sudo apt-get install -y nasm yasm pkg-config ccache
+
+      - name: Configure ccache
+        run: |
+          ccache --set-config=max_size=500M
+          ccache --set-config=compression=true
+          ccache -z
 
       - name: Build ffmpeg from source
         run: |
@@ -192,10 +220,14 @@ jobs:
             --enable-parser=opus \
             --enable-parser=flac \
             --prefix="$(pwd)/out" \
-            --extra-ldflags="-static"
+            --extra-ldflags="-static" \
+            --cc="ccache gcc"
           make -j$(nproc)
           cp ffmpeg ../embed/ffmpeg/ffmpeg_linux_arm64
           strip ../embed/ffmpeg/ffmpeg_linux_arm64 || true
+
+      - name: Show ccache stats
+        run: ccache -s
 
       - name: Build Go binary
         env:
@@ -233,7 +265,21 @@ jobs:
 
       - name: Install build dependencies
         run: |
-          brew install nasm pkg-config
+          brew install nasm pkg-config ccache
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/ccache
+          key: ccache-macos-arm64-${{ env.FFMPEG_VERSION }}
+          restore-keys: |
+            ccache-macos-arm64-
+
+      - name: Configure ccache
+        run: |
+          ccache --set-config=max_size=500M
+          ccache --set-config=compression=true
+          ccache -z
 
       - name: Build ffmpeg from source
         run: |
@@ -287,10 +333,14 @@ jobs:
             --enable-parser=vorbis \
             --enable-parser=opus \
             --enable-parser=flac \
-            --prefix="$(pwd)/out"
+            --prefix="$(pwd)/out" \
+            --cc="ccache clang"
           make -j$(sysctl -n hw.ncpu)
           cp ffmpeg ../embed/ffmpeg/ffmpeg_darwin_arm64
           strip ../embed/ffmpeg/ffmpeg_darwin_arm64 || true
+
+      - name: Show ccache stats
+        run: ccache -s
 
       - name: Build Go binary
         env:
