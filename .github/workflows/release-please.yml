@@ -22,17 +22,12 @@ jobs:
         with:
           release-type: go
 
-  build-linux:
+  build-linux-amd64:
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created }}
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - goarch: amd64
-            platform: linux-x64
-          - goarch: arm64
-            platform: linux-arm64
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    env:
+      FFMPEG_VERSION: "8.0"
     steps:
       - uses: actions/checkout@v4
 
@@ -41,40 +36,184 @@ jobs:
         with:
           go-version: '1.25.6'
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nasm yasm pkg-config
 
-      - name: Build ffmpeg for linux/${{ matrix.goarch }}
+      - name: Build ffmpeg from source
         run: |
           mkdir -p embed/ffmpeg
-          docker buildx build \
-            --platform "linux/${{ matrix.goarch }}" \
-            --target ffmpeg-builder \
-            --output "type=local,dest=.tmp-ffmpeg" \
-            --build-arg FFMPEG_VERSION=8.0 \
-            -f Dockerfile \
-            .
-          cp .tmp-ffmpeg/opt/ffmpeg/bin/ffmpeg "embed/ffmpeg/ffmpeg_linux_${{ matrix.goarch }}"
-          rm -rf .tmp-ffmpeg
+          curl -L -o ffmpeg.tar.xz "https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz"
+          tar xf ffmpeg.tar.xz
+          cd "ffmpeg-${FFMPEG_VERSION}"
+          ./configure \
+            --disable-debug \
+            --disable-doc \
+            --disable-ffplay \
+            --disable-ffprobe \
+            --disable-everything \
+            --disable-network \
+            --enable-static \
+            --disable-shared \
+            --enable-small \
+            --enable-protocol=pipe \
+            --enable-demuxer=matroska \
+            --enable-demuxer=mov \
+            --enable-demuxer=ogg \
+            --enable-demuxer=flac \
+            --enable-demuxer=wav \
+            --enable-demuxer=mp3 \
+            --enable-demuxer=aac \
+            --enable-decoder=aac \
+            --enable-decoder=aac_latm \
+            --enable-decoder=mp3 \
+            --enable-decoder=mp3float \
+            --enable-decoder=mp3on4 \
+            --enable-decoder=mp3on4float \
+            --enable-decoder=vorbis \
+            --enable-decoder=opus \
+            --enable-decoder=flac \
+            --enable-decoder=pcm_s16le \
+            --enable-decoder=pcm_s24le \
+            --enable-decoder=pcm_s32le \
+            --enable-decoder=pcm_f32le \
+            --enable-decoder=pcm_f64le \
+            --enable-encoder=pcm_s16le \
+            --enable-muxer=wav \
+            --enable-filter=aresample \
+            --enable-filter=aformat \
+            --enable-filter=highpass \
+            --enable-filter=lowpass \
+            --enable-filter=afftdn \
+            --enable-filter=adeclick \
+            --enable-filter=deesser \
+            --enable-filter=dynaudnorm \
+            --enable-parser=aac \
+            --enable-parser=vorbis \
+            --enable-parser=opus \
+            --enable-parser=flac \
+            --prefix="$(pwd)/out" \
+            --extra-ldflags="-static"
+          make -j$(nproc)
+          cp ffmpeg ../embed/ffmpeg/ffmpeg_linux_amd64
+          strip ../embed/ffmpeg/ffmpeg_linux_amd64 || true
 
       - name: Build Go binary
         env:
           GOOS: linux
-          GOARCH: ${{ matrix.goarch }}
+          GOARCH: amd64
           CGO_ENABLED: 0
         run: |
           go build -trimpath -ldflags='-s -w' -o "audio-extractor" .
 
       - name: Create release archive
         run: |
-          ARCHIVE_NAME="audio-extractor_${{ needs.release-please.outputs.version }}_${{ matrix.platform }}.tar.gz"
+          ARCHIVE_NAME="audio-extractor_${{ needs.release-please.outputs.version }}_linux-x64.tar.gz"
           tar -czvf "${ARCHIVE_NAME}" audio-extractor
           echo "ARCHIVE_NAME=${ARCHIVE_NAME}" >> $GITHUB_ENV
 
       - name: Upload release artifact
         uses: actions/upload-artifact@v4
         with:
-          name: audio-extractor-${{ matrix.platform }}
+          name: audio-extractor-linux-x64
+          path: ${{ env.ARCHIVE_NAME }}
+
+  build-linux-arm64:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: blacksmith-4vcpu-ubuntu-2404-arm
+    env:
+      FFMPEG_VERSION: "8.0"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.6'
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nasm yasm pkg-config
+
+      - name: Build ffmpeg from source
+        run: |
+          mkdir -p embed/ffmpeg
+          curl -L -o ffmpeg.tar.xz "https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz"
+          tar xf ffmpeg.tar.xz
+          cd "ffmpeg-${FFMPEG_VERSION}"
+          ./configure \
+            --disable-debug \
+            --disable-doc \
+            --disable-ffplay \
+            --disable-ffprobe \
+            --disable-everything \
+            --disable-network \
+            --enable-static \
+            --disable-shared \
+            --enable-small \
+            --enable-protocol=pipe \
+            --enable-demuxer=matroska \
+            --enable-demuxer=mov \
+            --enable-demuxer=ogg \
+            --enable-demuxer=flac \
+            --enable-demuxer=wav \
+            --enable-demuxer=mp3 \
+            --enable-demuxer=aac \
+            --enable-decoder=aac \
+            --enable-decoder=aac_latm \
+            --enable-decoder=mp3 \
+            --enable-decoder=mp3float \
+            --enable-decoder=mp3on4 \
+            --enable-decoder=mp3on4float \
+            --enable-decoder=vorbis \
+            --enable-decoder=opus \
+            --enable-decoder=flac \
+            --enable-decoder=pcm_s16le \
+            --enable-decoder=pcm_s24le \
+            --enable-decoder=pcm_s32le \
+            --enable-decoder=pcm_f32le \
+            --enable-decoder=pcm_f64le \
+            --enable-encoder=pcm_s16le \
+            --enable-muxer=wav \
+            --enable-filter=aresample \
+            --enable-filter=aformat \
+            --enable-filter=highpass \
+            --enable-filter=lowpass \
+            --enable-filter=afftdn \
+            --enable-filter=adeclick \
+            --enable-filter=deesser \
+            --enable-filter=dynaudnorm \
+            --enable-parser=aac \
+            --enable-parser=vorbis \
+            --enable-parser=opus \
+            --enable-parser=flac \
+            --prefix="$(pwd)/out" \
+            --extra-ldflags="-static"
+          make -j$(nproc)
+          cp ffmpeg ../embed/ffmpeg/ffmpeg_linux_arm64
+          strip ../embed/ffmpeg/ffmpeg_linux_arm64 || true
+
+      - name: Build Go binary
+        env:
+          GOOS: linux
+          GOARCH: arm64
+          CGO_ENABLED: 0
+        run: |
+          go build -trimpath -ldflags='-s -w' -o "audio-extractor" .
+
+      - name: Create release archive
+        run: |
+          ARCHIVE_NAME="audio-extractor_${{ needs.release-please.outputs.version }}_linux-arm64.tar.gz"
+          tar -czvf "${ARCHIVE_NAME}" audio-extractor
+          echo "ARCHIVE_NAME=${ARCHIVE_NAME}" >> $GITHUB_ENV
+
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: audio-extractor-linux-arm64
           path: ${{ env.ARCHIVE_NAME }}
 
   build-macos:
@@ -173,7 +312,7 @@ jobs:
           path: ${{ env.ARCHIVE_NAME }}
 
   upload-release-assets:
-    needs: [release-please, build-linux, build-macos]
+    needs: [release-please, build-linux-amd64, build-linux-arm64, build-macos]
     if: ${{ needs.release-please.outputs.release_created }}
     runs-on: ubuntu-latest
     steps:
