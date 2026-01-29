@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.1](https://github.com/Fields-Education/audio-extractor/compare/v1.5.0...v1.5.1) (2026-01-29)
+
+
+### Bug Fixes
+
+* enable file protocol for temp file input support ([d76b9c1](https://github.com/Fields-Education/audio-extractor/commit/d76b9c1e94ce09ca1ecb73118f0dc1665d68110f))
+
 ## [1.5.0](https://github.com/Fields-Education/audio-extractor/compare/v1.4.0...v1.5.0) (2026-01-29)
 
 
