@@ -20,6 +20,7 @@ set -eu
     \
     --enable-libmp3lame \
     \
+    --enable-protocol=file \
     --enable-protocol=pipe \
     \
     --enable-demuxer=matroska \
