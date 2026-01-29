@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.6
+# syntax=docker/dockerfile:1.21
 
 # --- Stage 1: Build ffmpeg (audio-only minimal) ---
 # Must build on target platform since FFmpeg can't easily cross-compile
