@@ -26,7 +26,7 @@ jobs:
   build-linux-amd64:
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created }}
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: blacksmith-8vcpu-ubuntu-2404
     env:
       FFMPEG_VERSION: "8.0"
     steps:
@@ -123,7 +123,7 @@ jobs:
   build-linux-arm64:
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created }}
-    runs-on: blacksmith-4vcpu-ubuntu-2404-arm
+    runs-on: blacksmith-8vcpu-ubuntu-2404-arm
     env:
       FFMPEG_VERSION: "8.0"
     steps:
@@ -336,7 +336,7 @@ jobs:
   docker-build-amd64:
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created }}
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: blacksmith-8vcpu-ubuntu-2404
     permissions:
       contents: read
       id-token: write
@@ -362,6 +362,8 @@ jobs:
           context: .
           push: true
           platforms: linux/amd64
+          provenance: false
+          sbom: false
           tags: |
             public.ecr.aws/m2l9b6l8/audio-extractor:${{ needs.release-please.outputs.version }}-amd64
             public.ecr.aws/m2l9b6l8/audio-extractor:latest-amd64
@@ -369,7 +371,7 @@ jobs:
   docker-build-arm64:
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created }}
-    runs-on: blacksmith-4vcpu-ubuntu-2404-arm
+    runs-on: blacksmith-8vcpu-ubuntu-2404-arm
     permissions:
       contents: read
       id-token: write
@@ -395,6 +397,8 @@ jobs:
           context: .
           push: true
           platforms: linux/arm64
+          provenance: false
+          sbom: false
           tags: |
             public.ecr.aws/m2l9b6l8/audio-extractor:${{ needs.release-please.outputs.version }}-arm64
             public.ecr.aws/m2l9b6l8/audio-extractor:latest-arm64
