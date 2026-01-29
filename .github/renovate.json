@@ -1,0 +1,99 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "group:allNonMajor"
+  ],
+  "labels": ["dependencies"],
+  "separateMajorMinor": true,
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Update FFMPEG_VERSION in Dockerfile",
+      "fileMatch": ["^Dockerfile$"],
+      "matchStrings": [
+        "ARG FFMPEG_VERSION=(?<currentValue>\\d+\\.\\d+(\\.\\d+)?)"
+      ],
+      "depNameTemplate": "FFmpeg/FFmpeg",
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^n(?<version>.*)$"
+    },
+    {
+      "customType": "regex",
+      "description": "Update FFMPEG_VERSION in GitHub Actions",
+      "fileMatch": ["^\\.github/workflows/.*\\.ya?ml$"],
+      "matchStrings": [
+        "FFMPEG_VERSION:\\s*[\"']?(?<currentValue>\\d+\\.\\d+(\\.\\d+)?)[\"']?"
+      ],
+      "depNameTemplate": "FFmpeg/FFmpeg",
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^n(?<version>.*)$"
+    },
+    {
+      "customType": "regex",
+      "description": "Update FFMPEG_VERSION in build scripts",
+      "fileMatch": ["^build-standalone\\.sh$"],
+      "matchStrings": [
+        "FFMPEG_VERSION:-(?<currentValue>\\d+\\.\\d+(\\.\\d+)?)"
+      ],
+      "depNameTemplate": "FFmpeg/FFmpeg",
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^n(?<version>.*)$"
+    },
+    {
+      "customType": "regex",
+      "description": "Update Go version in Dockerfile",
+      "fileMatch": ["^Dockerfile$"],
+      "matchStrings": [
+        "golang:(?<currentValue>\\d+\\.\\d+\\.\\d+)-alpine"
+      ],
+      "depNameTemplate": "golang",
+      "datasourceTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "description": "Update Go version in GitHub Actions",
+      "fileMatch": ["^\\.github/workflows/.*\\.ya?ml$"],
+      "matchStrings": [
+        "go-version:\\s*[\"'](?<currentValue>\\d+\\.\\d+\\.\\d+)[\"']"
+      ],
+      "depNameTemplate": "golang",
+      "datasourceTemplate": "docker"
+    }
+  ],
+  "packageRules": [
+    {
+      "matchDepNames": ["FFmpeg/FFmpeg"],
+      "groupName": "ffmpeg (non-major)",
+      "matchUpdateTypes": ["minor", "patch"],
+      "commitMessageTopic": "ffmpeg"
+    },
+    {
+      "matchDepNames": ["FFmpeg/FFmpeg"],
+      "matchUpdateTypes": ["major"],
+      "commitMessageTopic": "ffmpeg"
+    },
+    {
+      "matchDepNames": ["golang"],
+      "groupName": "golang (non-major)",
+      "matchUpdateTypes": ["minor", "patch"],
+      "commitMessageTopic": "Go"
+    },
+    {
+      "matchDepNames": ["golang"],
+      "matchUpdateTypes": ["major"],
+      "commitMessageTopic": "Go"
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "groupName": "github-actions (non-major)",
+      "matchUpdateTypes": ["minor", "patch"],
+      "commitMessageTopic": "GitHub Actions"
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["major"],
+      "commitMessageTopic": "GitHub Actions"
+    }
+  ]
+}
