@@ -87,38 +87,37 @@ func ffmpegLogLevel() string {
 	return "error"
 }
 
-func convertToWavPcm16WithCleanup(r io.Reader, filterMask int) ([]byte, error) {
+// runFFmpegWithTempInput writes the input to a temp file and runs ffmpeg.
+// This is required for formats like MP4/MOV that need seeking to read metadata.
+func runFFmpegWithTempInput(r io.Reader, outputArgs []string) ([]byte, error) {
+	// Create temp file for input
+	tmpFile, err := os.CreateTemp("", "audio-input-*")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temp file: %w", err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	// Write input to temp file
+	if _, err := io.Copy(tmpFile, r); err != nil {
+		tmpFile.Close()
+		return nil, fmt.Errorf("failed to write input: %w", err)
+	}
+	tmpFile.Close() // Close before ffmpeg reads it
+
+	// Build ffmpeg args with file input instead of pipe
 	args := []string{
 		"-hide_banner", "-loglevel", ffmpegLogLevel(),
-		"-i", "pipe:0",
+		"-i", tmpFile.Name(),
 	}
-
-	audioFilter := buildAudioFilter(filterMask)
-	if audioFilter != "" {
-		args = append(args, "-af", audioFilter)
-	}
-
-	args = append(args,
-		"-ac", "1",
-		"-ar", "16000",
-		"-f", "wav",
-		"-acodec", "pcm_s16le",
-		"pipe:1",
-	)
+	args = append(args, outputArgs...)
+	args = append(args, "pipe:1")
 
 	cmd := exec.Command(ffmpegPath, args...)
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		return nil, err
-	}
-	go func() {
-		defer stdin.Close()
-		io.Copy(stdin, r)
-	}()
+
 	if err := cmd.Run(); err != nil {
 		log.Printf("ffmpeg stderr: %s", stderr.String())
 		return nil, fmt.Errorf("%v: %s", err, stderr.String())
@@ -127,6 +126,24 @@ func convertToWavPcm16WithCleanup(r io.Reader, filterMask int) ([]byte, error) {
 		log.Printf("ffmpeg output: %s", stderr.String())
 	}
 	return stdout.Bytes(), nil
+}
+
+func convertToWavPcm16WithCleanup(r io.Reader, filterMask int) ([]byte, error) {
+	var outputArgs []string
+
+	audioFilter := buildAudioFilter(filterMask)
+	if audioFilter != "" {
+		outputArgs = append(outputArgs, "-af", audioFilter)
+	}
+
+	outputArgs = append(outputArgs,
+		"-ac", "1",
+		"-ar", "16000",
+		"-f", "wav",
+		"-acodec", "pcm_s16le",
+	)
+
+	return runFFmpegWithTempInput(r, outputArgs)
 }
 
 func convertToMp3(r io.Reader) ([]byte, error) {
@@ -134,46 +151,22 @@ func convertToMp3(r io.Reader) ([]byte, error) {
 }
 
 func convertToMp3WithCleanup(r io.Reader, filterMask int) ([]byte, error) {
-	args := []string{
-		"-hide_banner", "-loglevel", ffmpegLogLevel(),
-		"-i", "pipe:0",
-	}
+	var outputArgs []string
 
 	audioFilter := buildAudioFilter(filterMask)
 	if audioFilter != "" {
-		args = append(args, "-af", audioFilter)
+		outputArgs = append(outputArgs, "-af", audioFilter)
 	}
 
-	args = append(args,
+	outputArgs = append(outputArgs,
 		"-ac", "1",
 		"-ar", "16000",
 		"-f", "mp3",
 		"-acodec", "libmp3lame",
 		"-b:a", "128k",
-		"pipe:1",
 	)
 
-	cmd := exec.Command(ffmpegPath, args...)
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		return nil, err
-	}
-	go func() {
-		defer stdin.Close()
-		io.Copy(stdin, r)
-	}()
-	if err := cmd.Run(); err != nil {
-		log.Printf("ffmpeg stderr: %s", stderr.String())
-		return nil, fmt.Errorf("%v: %s", err, stderr.String())
-	}
-	if verbose && stderr.Len() > 0 {
-		log.Printf("ffmpeg output: %s", stderr.String())
-	}
-	return stdout.Bytes(), nil
+	return runFFmpegWithTempInput(r, outputArgs)
 }
 
 func convertToFlac(r io.Reader) ([]byte, error) {
@@ -181,46 +174,22 @@ func convertToFlac(r io.Reader) ([]byte, error) {
 }
 
 func convertToFlacWithCleanup(r io.Reader, filterMask int) ([]byte, error) {
-	args := []string{
-		"-hide_banner", "-loglevel", ffmpegLogLevel(),
-		"-i", "pipe:0",
-	}
+	var outputArgs []string
 
 	audioFilter := buildAudioFilter(filterMask)
 	if audioFilter != "" {
-		args = append(args, "-af", audioFilter)
+		outputArgs = append(outputArgs, "-af", audioFilter)
 	}
 
-	args = append(args,
+	outputArgs = append(outputArgs,
 		"-ac", "1",
 		"-ar", "16000",
 		"-f", "flac",
 		"-acodec", "flac",
 		"-compression_level", "5",
-		"pipe:1",
 	)
 
-	cmd := exec.Command(ffmpegPath, args...)
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		return nil, err
-	}
-	go func() {
-		defer stdin.Close()
-		io.Copy(stdin, r)
-	}()
-	if err := cmd.Run(); err != nil {
-		log.Printf("ffmpeg stderr: %s", stderr.String())
-		return nil, fmt.Errorf("%v: %s", err, stderr.String())
-	}
-	if verbose && stderr.Len() > 0 {
-		log.Printf("ffmpeg output: %s", stderr.String())
-	}
-	return stdout.Bytes(), nil
+	return runFFmpegWithTempInput(r, outputArgs)
 }
 
 func parseFilterMask(filterParam string) int {
