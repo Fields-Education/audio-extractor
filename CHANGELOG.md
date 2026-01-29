@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/Fields-Education/audio-extractor/compare/v1.1.0...v1.1.1) (2026-01-29)
+
+
+### Bug Fixes
+
+* disable provenance/sbom for Docker builds to fix manifest merge ([7a6949d](https://github.com/Fields-Education/audio-extractor/commit/7a6949d9aa60172326fc70fb0f80238fdeca893c))
+
 ## [1.1.0](https://github.com/Fields-Education/audio-extractor/compare/v1.0.1...v1.1.0) (2026-01-29)
 
 
