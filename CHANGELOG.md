@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.4.0](https://github.com/Fields-Education/audio-extractor/compare/v1.3.0...v1.4.0) (2026-01-29)
+
+
+### Features
+
+* add --local flag to build-standalone.sh for faster local builds ([fe9afc7](https://github.com/Fields-Education/audio-extractor/commit/fe9afc797ab001faba035a829e79904504d664a2))
+* publish release only after all assets and docker images are ready ([6d33adc](https://github.com/Fields-Education/audio-extractor/commit/6d33adc432191b96abc0bd1548dfd12540ac98d1))
+
+
+### Bug Fixes
+
+* add lame include/lib paths for macOS ffmpeg build ([3e5e537](https://github.com/Fields-Education/audio-extractor/commit/3e5e5376bdd855858510661c41c8c1324f592a46))
+* group all non-major updates into single PR ([fade4fe](https://github.com/Fields-Education/audio-extractor/commit/fade4fe5c6e0d90dd05905183bfda422958b9f73))
+
 ## [1.3.0](https://github.com/Fields-Education/audio-extractor/compare/v1.2.0...v1.3.0) (2026-01-29)
 
 
