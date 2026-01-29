@@ -40,18 +40,18 @@ jobs:
         id: cache
         uses: actions/cache@v4
         with:
-          path: ffmpeg-${{ env.FFMPEG_VERSION }}.tar.xz
+          path: ffmpeg.tar.xz
           key: ffmpeg-source-${{ env.FFMPEG_VERSION }}
 
       - name: Download ffmpeg source
         if: steps.cache.outputs.cache-hit != 'true'
-        run: ./scripts/download-ffmpeg.sh ffmpeg-${{ env.FFMPEG_VERSION }}.tar.xz
+        run: ./scripts/download-ffmpeg.sh
 
       - name: Upload ffmpeg source artifact
         uses: actions/upload-artifact@v4
         with:
           name: ffmpeg-source
-          path: ffmpeg-${{ env.FFMPEG_VERSION }}.tar.xz
+          path: ffmpeg.tar.xz
           retention-days: 1
 
   build-linux-amd64:
@@ -89,8 +89,6 @@ jobs:
           ccache -z
 
       - name: Build ffmpeg
-        env:
-          FFMPEG_TARBALL: ffmpeg-${{ env.FFMPEG_VERSION }}.tar.xz
         run: |
           mkdir -p embed/ffmpeg
           ./scripts/build-ffmpeg.sh embed/ffmpeg/ffmpeg_linux_amd64 --cc="ccache gcc"
@@ -153,8 +151,6 @@ jobs:
           ccache -z
 
       - name: Build ffmpeg
-        env:
-          FFMPEG_TARBALL: ffmpeg-${{ env.FFMPEG_VERSION }}.tar.xz
         run: |
           mkdir -p embed/ffmpeg
           ./scripts/build-ffmpeg.sh embed/ffmpeg/ffmpeg_linux_arm64 --cc="ccache gcc"
@@ -218,8 +214,6 @@ jobs:
           ccache -z
 
       - name: Build ffmpeg
-        env:
-          FFMPEG_TARBALL: ffmpeg-${{ env.FFMPEG_VERSION }}.tar.xz
         run: |
           mkdir -p embed/ffmpeg
           ./scripts/build-ffmpeg.sh embed/ffmpeg/ffmpeg_darwin_arm64 --cc="ccache clang"
@@ -270,7 +264,7 @@ jobs:
 
   # Docker image builds for linux/amd64 and linux/arm64
   docker-build-amd64:
-    needs: release-please
+    needs: [release-please, download-ffmpeg]
     if: ${{ needs.release-please.outputs.release_created }}
     runs-on: blacksmith-8vcpu-ubuntu-2404
     permissions:
@@ -278,6 +272,11 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v4
+
+      - name: Download ffmpeg source
+        uses: actions/download-artifact@v4
+        with:
+          name: ffmpeg-source
 
       - name: Set up Docker Builder
         uses: useblacksmith/setup-docker-builder@v1
@@ -305,7 +304,7 @@ jobs:
             public.ecr.aws/m2l9b6l8/audio-extractor:latest-amd64
 
   docker-build-arm64:
-    needs: release-please
+    needs: [release-please, download-ffmpeg]
     if: ${{ needs.release-please.outputs.release_created }}
     runs-on: blacksmith-8vcpu-ubuntu-2404-arm
     permissions:
@@ -313,6 +312,11 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v4
+
+      - name: Download ffmpeg source
+        uses: actions/download-artifact@v4
+        with:
+          name: ffmpeg-source
 
       - name: Set up Docker Builder
         uses: useblacksmith/setup-docker-builder@v1

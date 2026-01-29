@@ -1,19 +1,19 @@
 #!/bin/sh
 # Download ffmpeg source tarball
 # Usage: ./scripts/download-ffmpeg.sh [output-path]
-# Example: ./scripts/download-ffmpeg.sh ./cache/ffmpeg-8.0.tar.xz
+# Example: ./scripts/download-ffmpeg.sh ./ffmpeg.tar.xz
 
 set -eu
 
 FFMPEG_VERSION="${FFMPEG_VERSION:-8.0}"
-OUTPUT_PATH="${1:-ffmpeg-${FFMPEG_VERSION}.tar.xz}"
+OUTPUT_PATH="${1:-ffmpeg.tar.xz}"
 
 if [ -f "$OUTPUT_PATH" ]; then
     echo "==> Tarball already exists: ${OUTPUT_PATH}"
     exit 0
 fi
 
-mkdir -p "$(dirname "$OUTPUT_PATH")"
+mkdir -p "$(dirname "$OUTPUT_PATH")" 2>/dev/null || true
 
 echo "==> Downloading ffmpeg ${FFMPEG_VERSION} to ${OUTPUT_PATH}..."
 curl -L -o "$OUTPUT_PATH" "https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz"

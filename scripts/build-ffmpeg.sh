@@ -31,7 +31,7 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 FFMPEG_VERSION="${FFMPEG_VERSION:-8.0}"
-FFMPEG_TARBALL="${FFMPEG_TARBALL:-}"
+FFMPEG_TARBALL="${FFMPEG_TARBALL:-ffmpeg.tar.xz}"
 
 OUTPUT_PATH="$1"
 shift
@@ -48,8 +48,8 @@ trap cleanup EXIT
 
 cd "$BUILD_DIR"
 
-if [ -n "$FFMPEG_TARBALL" ] && [ -f "$FFMPEG_TARBALL" ]; then
-    echo "==> Using cached tarball: ${FFMPEG_TARBALL}"
+if [ -f "$FFMPEG_TARBALL" ]; then
+    echo "==> Using tarball: ${FFMPEG_TARBALL}"
     cp "$FFMPEG_TARBALL" ffmpeg.tar.xz
 else
     echo "==> Downloading ffmpeg ${FFMPEG_VERSION}..."
@@ -57,8 +57,9 @@ else
 fi
 
 echo "==> Extracting..."
-tar xf ffmpeg.tar.xz
-cd "ffmpeg-${FFMPEG_VERSION}"
+mkdir -p ffmpeg
+tar xf ffmpeg.tar.xz --strip-components=1 -C ffmpeg
+cd ffmpeg
 
 echo "==> Configuring..."
 # Detect platform-specific flags

@@ -17,12 +17,20 @@ ENV CCACHE_DIR=/root/.cache/ccache
 # Put ccache symlinks first in PATH so gcc/g++ calls go through ccache
 ENV PATH=/usr/lib/ccache/bin:$PATH
 WORKDIR /build
-RUN curl -L -o ffmpeg.tar.xz https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz
+# Copy configure script and tarball (if present in build context)
+COPY scripts/ffmpeg-configure.sh /build/
+COPY ffmpeg.tar.x[z] /build/
+# Download if tarball wasn't provided
+ARG FFMPEG_VERSION=8.0
+RUN if [ ! -f /build/ffmpeg.tar.xz ]; then \
+      echo "Downloading ffmpeg ${FFMPEG_VERSION}..."; \
+      curl -L -o /build/ffmpeg.tar.xz https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz; \
+    else \
+      echo "Using pre-downloaded tarball"; \
+    fi
 # Extract to fixed path so ccache hits work across version bumps
-RUN mkdir -p /build/ffmpeg && tar xf ffmpeg.tar.xz --strip-components=1 -C /build/ffmpeg
+RUN mkdir -p /build/ffmpeg && tar xf /build/ffmpeg.tar.xz --strip-components=1 -C /build/ffmpeg
 WORKDIR /build/ffmpeg
-# Copy shared configure script
-COPY scripts/ffmpeg-configure.sh /build/ffmpeg-configure.sh
 RUN --mount=type=cache,target=/root/.cache/ccache /build/ffmpeg-configure.sh \
   --prefix=${PREFIX} \
   --pkg-config-flags="--static" \
