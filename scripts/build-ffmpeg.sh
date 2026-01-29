@@ -32,9 +32,24 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 FFMPEG_VERSION="${FFMPEG_VERSION:-8.0}"
 FFMPEG_TARBALL="${FFMPEG_TARBALL:-ffmpeg.tar.xz}"
+START_DIR="$(pwd)"
 
 OUTPUT_PATH="$1"
 shift
+
+# Convert to absolute path
+case "$OUTPUT_PATH" in
+    /*) ;;  # Already absolute
+    *) OUTPUT_PATH="${START_DIR}/${OUTPUT_PATH}" ;;
+esac
+
+# Convert tarball to absolute path if it exists
+if [ -f "$FFMPEG_TARBALL" ]; then
+    case "$FFMPEG_TARBALL" in
+        /*) ;;  # Already absolute
+        *) FFMPEG_TARBALL="${START_DIR}/${FFMPEG_TARBALL}" ;;
+    esac
+fi
 
 # Create output directory if needed
 mkdir -p "$(dirname "$OUTPUT_PATH")"

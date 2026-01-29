@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -13,8 +14,18 @@ import (
 	"time"
 )
 
+// Version information - injected at build time via ldflags
+var (
+	version = "dev"
+	commit  = "unknown"
+	date    = "unknown"
+)
+
 // ffmpegPath is set by init() in either ffmpeg_embedded.go or ffmpeg_docker.go
 var ffmpegPath string
+
+// verbose controls whether ffmpeg output is logged
+var verbose bool
 
 const (
 	FilterHighpass           = 1 << 0 // 1   - Remove low-frequency rumble
@@ -69,9 +80,16 @@ func convertToWavPcm16(r io.Reader) ([]byte, error) {
 	return convertToWavPcm16WithCleanup(r, 0)
 }
 
+func ffmpegLogLevel() string {
+	if verbose {
+		return "info"
+	}
+	return "error"
+}
+
 func convertToWavPcm16WithCleanup(r io.Reader, filterMask int) ([]byte, error) {
 	args := []string{
-		"-hide_banner", "-loglevel", "error",
+		"-hide_banner", "-loglevel", ffmpegLogLevel(),
 		"-i", "pipe:0",
 	}
 
@@ -105,6 +123,9 @@ func convertToWavPcm16WithCleanup(r io.Reader, filterMask int) ([]byte, error) {
 		log.Printf("ffmpeg stderr: %s", stderr.String())
 		return nil, fmt.Errorf("%v: %s", err, stderr.String())
 	}
+	if verbose && stderr.Len() > 0 {
+		log.Printf("ffmpeg output: %s", stderr.String())
+	}
 	return stdout.Bytes(), nil
 }
 
@@ -114,7 +135,7 @@ func convertToMp3(r io.Reader) ([]byte, error) {
 
 func convertToMp3WithCleanup(r io.Reader, filterMask int) ([]byte, error) {
 	args := []string{
-		"-hide_banner", "-loglevel", "error",
+		"-hide_banner", "-loglevel", ffmpegLogLevel(),
 		"-i", "pipe:0",
 	}
 
@@ -133,9 +154,10 @@ func convertToMp3WithCleanup(r io.Reader, filterMask int) ([]byte, error) {
 	)
 
 	cmd := exec.Command(ffmpegPath, args...)
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &out
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, err
@@ -145,9 +167,13 @@ func convertToMp3WithCleanup(r io.Reader, filterMask int) ([]byte, error) {
 		io.Copy(stdin, r)
 	}()
 	if err := cmd.Run(); err != nil {
-		return nil, err
+		log.Printf("ffmpeg stderr: %s", stderr.String())
+		return nil, fmt.Errorf("%v: %s", err, stderr.String())
 	}
-	return out.Bytes(), nil
+	if verbose && stderr.Len() > 0 {
+		log.Printf("ffmpeg output: %s", stderr.String())
+	}
+	return stdout.Bytes(), nil
 }
 
 func convertToFlac(r io.Reader) ([]byte, error) {
@@ -156,7 +182,7 @@ func convertToFlac(r io.Reader) ([]byte, error) {
 
 func convertToFlacWithCleanup(r io.Reader, filterMask int) ([]byte, error) {
 	args := []string{
-		"-hide_banner", "-loglevel", "error",
+		"-hide_banner", "-loglevel", ffmpegLogLevel(),
 		"-i", "pipe:0",
 	}
 
@@ -175,9 +201,10 @@ func convertToFlacWithCleanup(r io.Reader, filterMask int) ([]byte, error) {
 	)
 
 	cmd := exec.Command(ffmpegPath, args...)
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &out
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, err
@@ -187,9 +214,13 @@ func convertToFlacWithCleanup(r io.Reader, filterMask int) ([]byte, error) {
 		io.Copy(stdin, r)
 	}()
 	if err := cmd.Run(); err != nil {
-		return nil, err
+		log.Printf("ffmpeg stderr: %s", stderr.String())
+		return nil, fmt.Errorf("%v: %s", err, stderr.String())
 	}
-	return out.Bytes(), nil
+	if verbose && stderr.Len() > 0 {
+		log.Printf("ffmpeg output: %s", stderr.String())
+	}
+	return stdout.Bytes(), nil
 }
 
 func parseFilterMask(filterParam string) int {
@@ -256,9 +287,26 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	showVersion := flag.Bool("version", false, "Print version information and exit")
+	flag.BoolVar(&verbose, "verbose", false, "Enable verbose logging of ffmpeg output")
+	flag.BoolVar(&verbose, "v", false, "Enable verbose logging of ffmpeg output (shorthand)")
+	flag.Parse()
+
+	if *showVersion {
+		fmt.Printf("audio-extractor %s\n", version)
+		fmt.Printf("  commit: %s\n", commit)
+		fmt.Printf("  built:  %s\n", date)
+		os.Exit(0)
+	}
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
+	}
+
+	// Also allow verbose via environment variable
+	if os.Getenv("VERBOSE") == "true" || os.Getenv("VERBOSE") == "1" {
+		verbose = true
 	}
 
 	mux := http.NewServeMux()
@@ -269,6 +317,9 @@ func main() {
 		Handler:           mux,
 		ReadHeaderTimeout: 15 * time.Second,
 	}
-	log.Printf("ffmpeg audio extractor v2 listening on :%s", port)
+	if verbose {
+		log.Printf("verbose logging enabled")
+	}
+	log.Printf("audio-extractor %s listening on :%s", version, port)
 	log.Fatal(srv.ListenAndServe())
 }

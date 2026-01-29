@@ -51,12 +51,17 @@ ARG TARGETPLATFORM
 ARG TARGETOS
 ARG TARGETARCH
 ARG BUILDPLATFORM
+ARG VERSION=dev
+ARG COMMIT=unknown
+ARG BUILD_DATE=unknown
 WORKDIR /app
 COPY go.mod .
 COPY main.go ffmpeg_docker.go ./
 RUN --mount=type=cache,target=/root/.cache/go-build \
   --mount=type=cache,target=/go/pkg/mod \
-  CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -tags docker -trimpath -ldflags='-s -w' -o /out/server .
+  CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -tags docker -trimpath \
+  -ldflags="-s -w -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.date=${BUILD_DATE}" \
+  -o /out/server .
 
 # --- Stage 3: Runtime image ---
 FROM --platform=${TARGETPLATFORM} scratch

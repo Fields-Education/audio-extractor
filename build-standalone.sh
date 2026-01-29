@@ -144,9 +144,15 @@ for platform in "${PLATFORMS[@]}"; do
     
     echo "    Building ${output_name}..."
     
+    # Get version info
+    VERSION="${VERSION:-dev}"
+    COMMIT="${COMMIT:-$(git rev-parse --short HEAD 2>/dev/null || echo unknown)}"
+    BUILD_DATE="${BUILD_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
+    LDFLAGS="-s -w -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.date=${BUILD_DATE}"
+    
     CGO_ENABLED=0 GOOS="${os}" GOARCH="${arch}" go build \
         -trimpath \
-        -ldflags='-s -w' \
+        -ldflags="${LDFLAGS}" \
         -o "${OUT_DIR}/${output_name}" \
         .
     
