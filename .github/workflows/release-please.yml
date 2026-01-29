@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   release-please:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
@@ -33,7 +33,7 @@ jobs:
   download-ffmpeg:
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created }}
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v4
 
@@ -257,7 +257,7 @@ jobs:
   upload-release-assets:
     needs: [release-please, build-linux-amd64, build-linux-arm64, build-macos]
     if: ${{ needs.release-please.outputs.release_created }}
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -407,7 +407,7 @@ jobs:
   publish-release:
     needs: [release-please, upload-release-assets, docker-merge-manifest]
     if: ${{ needs.release-please.outputs.release_created }}
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     steps:
       - name: Publish release
         env:
