@@ -199,7 +199,9 @@ jobs:
           cd "ffmpeg-${FFMPEG_VERSION}"
           ../scripts/ffmpeg-configure.sh \
             --prefix="$(pwd)/out" \
-            --cc="ccache clang"
+            --cc="ccache clang" \
+            --extra-cflags="-I$(brew --prefix lame)/include" \
+            --extra-ldflags="-L$(brew --prefix lame)/lib"
           make -j$(sysctl -n hw.ncpu)
           cp ffmpeg ../embed/ffmpeg/ffmpeg_darwin_arm64
           strip ../embed/ffmpeg/ffmpeg_darwin_arm64 || true

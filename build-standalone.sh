@@ -82,7 +82,9 @@ build_ffmpeg_darwin() {
     
     # Use shared configure script
     "${SCRIPT_DIR}/scripts/ffmpeg-configure.sh" \
-        --prefix="${FFMPEG_BUILD_DIR}/out"
+        --prefix="${FFMPEG_BUILD_DIR}/out" \
+        --extra-cflags="-I$(brew --prefix lame)/include" \
+        --extra-ldflags="-L$(brew --prefix lame)/lib"
     
     make -j"$(sysctl -n hw.ncpu)"
     
