@@ -46,7 +46,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y nasm yasm pkg-config ccache
+          sudo apt-get install -y nasm yasm pkg-config ccache libmp3lame-dev
 
       - name: Configure ccache
         run: |
@@ -60,52 +60,7 @@ jobs:
           curl -L -o ffmpeg.tar.xz "https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz"
           tar xf ffmpeg.tar.xz
           cd "ffmpeg-${FFMPEG_VERSION}"
-          ./configure \
-            --disable-debug \
-            --disable-doc \
-            --disable-ffplay \
-            --disable-ffprobe \
-            --disable-everything \
-            --disable-network \
-            --enable-static \
-            --disable-shared \
-            --enable-small \
-            --enable-protocol=pipe \
-            --enable-demuxer=matroska \
-            --enable-demuxer=mov \
-            --enable-demuxer=ogg \
-            --enable-demuxer=flac \
-            --enable-demuxer=wav \
-            --enable-demuxer=mp3 \
-            --enable-demuxer=aac \
-            --enable-decoder=aac \
-            --enable-decoder=aac_latm \
-            --enable-decoder=mp3 \
-            --enable-decoder=mp3float \
-            --enable-decoder=mp3on4 \
-            --enable-decoder=mp3on4float \
-            --enable-decoder=vorbis \
-            --enable-decoder=opus \
-            --enable-decoder=flac \
-            --enable-decoder=pcm_s16le \
-            --enable-decoder=pcm_s24le \
-            --enable-decoder=pcm_s32le \
-            --enable-decoder=pcm_f32le \
-            --enable-decoder=pcm_f64le \
-            --enable-encoder=pcm_s16le \
-            --enable-muxer=wav \
-            --enable-filter=aresample \
-            --enable-filter=aformat \
-            --enable-filter=highpass \
-            --enable-filter=lowpass \
-            --enable-filter=afftdn \
-            --enable-filter=adeclick \
-            --enable-filter=deesser \
-            --enable-filter=dynaudnorm \
-            --enable-parser=aac \
-            --enable-parser=vorbis \
-            --enable-parser=opus \
-            --enable-parser=flac \
+          ../scripts/ffmpeg-configure.sh \
             --prefix="$(pwd)/out" \
             --extra-ldflags="-static" \
             --cc="ccache gcc"
@@ -159,7 +114,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y nasm yasm pkg-config ccache
+          sudo apt-get install -y nasm yasm pkg-config ccache libmp3lame-dev
 
       - name: Configure ccache
         run: |
@@ -173,52 +128,7 @@ jobs:
           curl -L -o ffmpeg.tar.xz "https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz"
           tar xf ffmpeg.tar.xz
           cd "ffmpeg-${FFMPEG_VERSION}"
-          ./configure \
-            --disable-debug \
-            --disable-doc \
-            --disable-ffplay \
-            --disable-ffprobe \
-            --disable-everything \
-            --disable-network \
-            --enable-static \
-            --disable-shared \
-            --enable-small \
-            --enable-protocol=pipe \
-            --enable-demuxer=matroska \
-            --enable-demuxer=mov \
-            --enable-demuxer=ogg \
-            --enable-demuxer=flac \
-            --enable-demuxer=wav \
-            --enable-demuxer=mp3 \
-            --enable-demuxer=aac \
-            --enable-decoder=aac \
-            --enable-decoder=aac_latm \
-            --enable-decoder=mp3 \
-            --enable-decoder=mp3float \
-            --enable-decoder=mp3on4 \
-            --enable-decoder=mp3on4float \
-            --enable-decoder=vorbis \
-            --enable-decoder=opus \
-            --enable-decoder=flac \
-            --enable-decoder=pcm_s16le \
-            --enable-decoder=pcm_s24le \
-            --enable-decoder=pcm_s32le \
-            --enable-decoder=pcm_f32le \
-            --enable-decoder=pcm_f64le \
-            --enable-encoder=pcm_s16le \
-            --enable-muxer=wav \
-            --enable-filter=aresample \
-            --enable-filter=aformat \
-            --enable-filter=highpass \
-            --enable-filter=lowpass \
-            --enable-filter=afftdn \
-            --enable-filter=adeclick \
-            --enable-filter=deesser \
-            --enable-filter=dynaudnorm \
-            --enable-parser=aac \
-            --enable-parser=vorbis \
-            --enable-parser=opus \
-            --enable-parser=flac \
+          ../scripts/ffmpeg-configure.sh \
             --prefix="$(pwd)/out" \
             --extra-ldflags="-static" \
             --cc="ccache gcc"
@@ -265,7 +175,7 @@ jobs:
 
       - name: Install build dependencies
         run: |
-          brew install nasm pkg-config ccache
+          brew install nasm pkg-config ccache lame
 
       - name: Cache ccache
         uses: actions/cache@v4
@@ -287,52 +197,7 @@ jobs:
           curl -L -o ffmpeg.tar.xz "https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz"
           tar xf ffmpeg.tar.xz
           cd "ffmpeg-${FFMPEG_VERSION}"
-          ./configure \
-            --disable-debug \
-            --disable-doc \
-            --disable-ffplay \
-            --disable-ffprobe \
-            --disable-everything \
-            --disable-network \
-            --enable-static \
-            --disable-shared \
-            --enable-small \
-            --enable-protocol=pipe \
-            --enable-demuxer=matroska \
-            --enable-demuxer=mov \
-            --enable-demuxer=ogg \
-            --enable-demuxer=flac \
-            --enable-demuxer=wav \
-            --enable-demuxer=mp3 \
-            --enable-demuxer=aac \
-            --enable-decoder=aac \
-            --enable-decoder=aac_latm \
-            --enable-decoder=mp3 \
-            --enable-decoder=mp3float \
-            --enable-decoder=mp3on4 \
-            --enable-decoder=mp3on4float \
-            --enable-decoder=vorbis \
-            --enable-decoder=opus \
-            --enable-decoder=flac \
-            --enable-decoder=pcm_s16le \
-            --enable-decoder=pcm_s24le \
-            --enable-decoder=pcm_s32le \
-            --enable-decoder=pcm_f32le \
-            --enable-decoder=pcm_f64le \
-            --enable-encoder=pcm_s16le \
-            --enable-muxer=wav \
-            --enable-filter=aresample \
-            --enable-filter=aformat \
-            --enable-filter=highpass \
-            --enable-filter=lowpass \
-            --enable-filter=afftdn \
-            --enable-filter=adeclick \
-            --enable-filter=deesser \
-            --enable-filter=dynaudnorm \
-            --enable-parser=aac \
-            --enable-parser=vorbis \
-            --enable-parser=opus \
-            --enable-parser=flac \
+          ../scripts/ffmpeg-configure.sh \
             --prefix="$(pwd)/out" \
             --cc="ccache clang"
           make -j$(sysctl -n hw.ncpu)

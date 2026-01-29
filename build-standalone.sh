@@ -69,6 +69,7 @@ build_ffmpeg_darwin() {
     # Install build dependencies if needed
     brew list nasm &>/dev/null || brew install nasm
     brew list pkg-config &>/dev/null || brew install pkg-config
+    brew list lame &>/dev/null || brew install lame
     
     # Build ffmpeg from source with minimal config
     FFMPEG_BUILD_DIR=$(mktemp -d)
@@ -79,55 +80,8 @@ build_ffmpeg_darwin() {
     tar xf ffmpeg.tar.xz
     cd "ffmpeg-${FFMPEG_VERSION}"
     
-    ./configure \
-        --disable-debug \
-        --disable-doc \
-        --disable-ffplay \
-        --disable-ffprobe \
-        --disable-everything \
-        --disable-network \
-        --enable-static \
-        --disable-shared \
-        --enable-small \
-        --enable-protocol=pipe \
-        --enable-demuxer=matroska \
-        --enable-demuxer=webm \
-        --enable-demuxer=mov \
-        --enable-demuxer=mp4 \
-        --enable-demuxer=ogg \
-        --enable-demuxer=flac \
-        --enable-demuxer=wav \
-        --enable-demuxer=mp3 \
-        --enable-demuxer=aac \
-        --enable-decoder=aac \
-        --enable-decoder=aac_latm \
-        --enable-decoder=mp3 \
-        --enable-decoder=mp3float \
-        --enable-decoder=mp3on4 \
-        --enable-decoder=mp3on4float \
-        --enable-decoder=vorbis \
-        --enable-decoder=opus \
-        --enable-decoder=flac \
-        --enable-decoder=pcm_s16le \
-        --enable-decoder=pcm_s24le \
-        --enable-decoder=pcm_s32le \
-        --enable-decoder=pcm_f32le \
-        --enable-decoder=pcm_f64le \
-        --enable-encoder=pcm_s16le \
-        --enable-muxer=wav \
-        --enable-filter=aresample \
-        --enable-filter=aformat \
-        --enable-filter=highpass \
-        --enable-filter=lowpass \
-        --enable-filter=afftdn \
-        --enable-filter=adeclick \
-        --enable-filter=deesser \
-        --enable-filter=dynaudnorm \
-        --enable-parser=aac \
-        --enable-parser=mp3 \
-        --enable-parser=vorbis \
-        --enable-parser=opus \
-        --enable-parser=flac \
+    # Use shared configure script
+    "${SCRIPT_DIR}/scripts/ffmpeg-configure.sh" \
         --prefix="${FFMPEG_BUILD_DIR}/out"
     
     make -j"$(sysctl -n hw.ncpu)"
