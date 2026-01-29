@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -255,14 +256,19 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/convert", convertHandler)
 	mux.HandleFunc("/health", healthHandler)
 	srv := &http.Server{
-		Addr:              ":8080",
+		Addr:              ":" + port,
 		Handler:           mux,
 		ReadHeaderTimeout: 15 * time.Second,
 	}
-	log.Printf("ffmpeg audio extractor v2 listening on :8080")
+	log.Printf("ffmpeg audio extractor v2 listening on :%s", port)
 	log.Fatal(srv.ListenAndServe())
 }
