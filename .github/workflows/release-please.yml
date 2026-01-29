@@ -8,6 +8,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  id-token: write
 
 jobs:
   release-please:
@@ -330,3 +331,110 @@ jobs:
               gh release upload "${{ needs.release-please.outputs.tag_name }}" "$file" --repo ${{ github.repository }}
             done
           done
+
+  # Docker image builds for linux/amd64 and linux/arm64
+  docker-build-amd64:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Builder
+        uses: useblacksmith/setup-docker-builder@v1
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ECR_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Login to Amazon ECR Public
+        run: |
+          aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws
+
+      - name: Build and push Docker image
+        uses: useblacksmith/build-push-action@v2
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64
+          tags: |
+            public.ecr.aws/m2l9b6l8/audio-extractor:${{ needs.release-please.outputs.version }}-amd64
+            public.ecr.aws/m2l9b6l8/audio-extractor:latest-amd64
+
+  docker-build-arm64:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: blacksmith-4vcpu-ubuntu-2404-arm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Builder
+        uses: useblacksmith/setup-docker-builder@v1
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ECR_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Login to Amazon ECR Public
+        run: |
+          aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws
+
+      - name: Build and push Docker image
+        uses: useblacksmith/build-push-action@v2
+        with:
+          context: .
+          push: true
+          platforms: linux/arm64
+          tags: |
+            public.ecr.aws/m2l9b6l8/audio-extractor:${{ needs.release-please.outputs.version }}-arm64
+            public.ecr.aws/m2l9b6l8/audio-extractor:latest-arm64
+
+  docker-merge-manifest:
+    needs: [release-please, docker-build-amd64, docker-build-arm64]
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ECR_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Login to Amazon ECR Public
+        run: |
+          aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws
+
+      - name: Create and push multi-arch manifest (versioned)
+        run: |
+          docker manifest create public.ecr.aws/m2l9b6l8/audio-extractor:${{ needs.release-please.outputs.version }} \
+            public.ecr.aws/m2l9b6l8/audio-extractor:${{ needs.release-please.outputs.version }}-amd64 \
+            public.ecr.aws/m2l9b6l8/audio-extractor:${{ needs.release-please.outputs.version }}-arm64
+          docker manifest annotate public.ecr.aws/m2l9b6l8/audio-extractor:${{ needs.release-please.outputs.version }} \
+            public.ecr.aws/m2l9b6l8/audio-extractor:${{ needs.release-please.outputs.version }}-amd64 --arch amd64
+          docker manifest annotate public.ecr.aws/m2l9b6l8/audio-extractor:${{ needs.release-please.outputs.version }} \
+            public.ecr.aws/m2l9b6l8/audio-extractor:${{ needs.release-please.outputs.version }}-arm64 --arch arm64
+          docker manifest push public.ecr.aws/m2l9b6l8/audio-extractor:${{ needs.release-please.outputs.version }}
+
+      - name: Create and push multi-arch manifest (latest)
+        run: |
+          docker manifest create public.ecr.aws/m2l9b6l8/audio-extractor:latest \
+            public.ecr.aws/m2l9b6l8/audio-extractor:latest-amd64 \
+            public.ecr.aws/m2l9b6l8/audio-extractor:latest-arm64
+          docker manifest annotate public.ecr.aws/m2l9b6l8/audio-extractor:latest \
+            public.ecr.aws/m2l9b6l8/audio-extractor:latest-amd64 --arch amd64
+          docker manifest annotate public.ecr.aws/m2l9b6l8/audio-extractor:latest \
+            public.ecr.aws/m2l9b6l8/audio-extractor:latest-arm64 --arch arm64
+          docker manifest push public.ecr.aws/m2l9b6l8/audio-extractor:latest
