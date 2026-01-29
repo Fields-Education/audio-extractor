@@ -7,15 +7,48 @@ cd "$SCRIPT_DIR"
 FFMPEG_VERSION="${FFMPEG_VERSION:-8.0}"
 EMBED_DIR="embed/ffmpeg"
 OUT_DIR="dist"
+LOCAL_ONLY=false
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --local|-l)
+            LOCAL_ONLY=true
+            shift
+            ;;
+        --help|-h)
+            echo "Usage: $0 [OPTIONS]"
+            echo ""
+            echo "Options:"
+            echo "  --local, -l    Only build for the current platform"
+            echo "  --help, -h     Show this help message"
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+    esac
+done
+
+# Detect current platform
+CURRENT_OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+CURRENT_ARCH=$(uname -m)
+[[ "${CURRENT_ARCH}" == "x86_64" ]] && CURRENT_ARCH="amd64"
+[[ "${CURRENT_ARCH}" == "aarch64" || "${CURRENT_ARCH}" == "arm64" ]] && CURRENT_ARCH="arm64"
 
 # Platforms to build
-PLATFORMS=(
-    "linux/amd64"
-    "linux/arm64"
-    "darwin/arm64"
-)
-
-echo "==> Building ffmpeg ${FFMPEG_VERSION} for all platforms..."
+if [[ "${LOCAL_ONLY}" == "true" ]]; then
+    PLATFORMS=("${CURRENT_OS}/${CURRENT_ARCH}")
+    echo "==> Building ffmpeg ${FFMPEG_VERSION} for current platform only (${CURRENT_OS}/${CURRENT_ARCH})..."
+else
+    PLATFORMS=(
+        "linux/amd64"
+        "linux/arm64"
+        "darwin/arm64"
+    )
+    echo "==> Building ffmpeg ${FFMPEG_VERSION} for all platforms..."
+fi
 
 # Build ffmpeg for Linux platforms using Docker
 build_ffmpeg_linux() {
@@ -105,29 +138,21 @@ mkdir -p "${OUT_DIR}"
 # Build ffmpeg for each platform
 echo ""
 echo "==> Building ffmpeg binaries..."
-build_ffmpeg_linux "amd64"
-build_ffmpeg_linux "arm64"
-build_ffmpeg_darwin
+for platform in "${PLATFORMS[@]}"; do
+    os="${platform%/*}"
+    arch="${platform#*/}"
+    if [[ "${os}" == "linux" ]]; then
+        build_ffmpeg_linux "${arch}"
+    elif [[ "${os}" == "darwin" ]]; then
+        build_ffmpeg_darwin
+    fi
+done
 
 # Initialize go module if needed
 if [[ ! -f "go.mod" ]]; then
     echo "    Initializing Go module..."
     go mod init github.com/Fields-Education/audio-extractor
     go mod tidy
-fi
-
-# Check that we have at least the current platform's ffmpeg
-CURRENT_OS=$(uname -s | tr '[:upper:]' '[:lower:]')
-CURRENT_ARCH=$(uname -m)
-[[ "${CURRENT_ARCH}" == "x86_64" ]] && CURRENT_ARCH="amd64"
-[[ "${CURRENT_ARCH}" == "aarch64" ]] && CURRENT_ARCH="arm64"
-
-CURRENT_FFMPEG="${EMBED_DIR}/ffmpeg_${CURRENT_OS}_${CURRENT_ARCH}"
-if [[ ! -f "${CURRENT_FFMPEG}" ]]; then
-    echo ""
-    echo "ERROR: Missing ffmpeg for current platform: ${CURRENT_FFMPEG}"
-    echo "Cannot build standalone binary without it."
-    exit 1
 fi
 
 # Build Go binary for each platform (without docker tag = embedded ffmpeg)
