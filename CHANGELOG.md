@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/Fields-Education/audio-extractor/compare/v1.2.0...v1.3.0) (2026-01-29)
+
+
+### Features
+
+* add mp3 muxer support and centralize ffmpeg build config ([a394d2f](https://github.com/Fields-Education/audio-extractor/commit/a394d2fd2f073263748874955c6eebdfbe3276fa))
+
 ## [1.2.0](https://github.com/Fields-Education/audio-extractor/compare/v1.1.1...v1.2.0) (2026-01-29)
 
 
