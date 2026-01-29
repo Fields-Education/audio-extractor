@@ -5,6 +5,12 @@ on:
     branches:
       - main
 
+env:
+  # renovate: datasource=github-releases depName=FFmpeg/FFmpeg extractVersion=^n(?<version>.*)$
+  FFMPEG_VERSION: "8.0"
+  # renovate: datasource=docker depName=golang
+  GO_VERSION: "1.25.6"
+
 permissions:
   contents: write
   pull-requests: write
@@ -23,14 +29,42 @@ jobs:
         with:
           release-type: go
 
-  build-linux-amd64:
+  download-ffmpeg:
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created }}
-    runs-on: blacksmith-8vcpu-ubuntu-2404
-    env:
-      FFMPEG_VERSION: "8.0"
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Cache ffmpeg source
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: ffmpeg-${{ env.FFMPEG_VERSION }}.tar.xz
+          key: ffmpeg-source-${{ env.FFMPEG_VERSION }}
+
+      - name: Download ffmpeg source
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: ./scripts/download-ffmpeg.sh ffmpeg-${{ env.FFMPEG_VERSION }}.tar.xz
+
+      - name: Upload ffmpeg source artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-source
+          path: ffmpeg-${{ env.FFMPEG_VERSION }}.tar.xz
+          retention-days: 1
+
+  build-linux-amd64:
+    needs: [release-please, download-ffmpeg]
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: blacksmith-8vcpu-ubuntu-2404
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download ffmpeg source
+        uses: actions/download-artifact@v4
+        with:
+          name: ffmpeg-source
 
       - name: Mount ccache sticky disk
         uses: useblacksmith/stickydisk@v1
@@ -41,7 +75,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.25.6'
+          go-version: ${{ env.GO_VERSION }}
 
       - name: Install build dependencies
         run: |
@@ -54,19 +88,12 @@ jobs:
           ccache --set-config=compression=true
           ccache -z
 
-      - name: Build ffmpeg from source
+      - name: Build ffmpeg
+        env:
+          FFMPEG_TARBALL: ffmpeg-${{ env.FFMPEG_VERSION }}.tar.xz
         run: |
           mkdir -p embed/ffmpeg
-          curl -L -o ffmpeg.tar.xz "https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz"
-          tar xf ffmpeg.tar.xz
-          cd "ffmpeg-${FFMPEG_VERSION}"
-          ../scripts/ffmpeg-configure.sh \
-            --prefix="$(pwd)/out" \
-            --extra-ldflags="-static" \
-            --cc="ccache gcc"
-          make -j$(nproc)
-          cp ffmpeg ../embed/ffmpeg/ffmpeg_linux_amd64
-          strip ../embed/ffmpeg/ffmpeg_linux_amd64 || true
+          ./scripts/build-ffmpeg.sh embed/ffmpeg/ffmpeg_linux_amd64 --cc="ccache gcc"
 
       - name: Show ccache stats
         run: ccache -s
@@ -92,13 +119,16 @@ jobs:
           path: ${{ env.ARCHIVE_NAME }}
 
   build-linux-arm64:
-    needs: release-please
+    needs: [release-please, download-ffmpeg]
     if: ${{ needs.release-please.outputs.release_created }}
     runs-on: blacksmith-8vcpu-ubuntu-2404-arm
-    env:
-      FFMPEG_VERSION: "8.0"
     steps:
       - uses: actions/checkout@v4
+
+      - name: Download ffmpeg source
+        uses: actions/download-artifact@v4
+        with:
+          name: ffmpeg-source
 
       - name: Mount ccache sticky disk
         uses: useblacksmith/stickydisk@v1
@@ -109,7 +139,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.25.6'
+          go-version: ${{ env.GO_VERSION }}
 
       - name: Install build dependencies
         run: |
@@ -122,19 +152,12 @@ jobs:
           ccache --set-config=compression=true
           ccache -z
 
-      - name: Build ffmpeg from source
+      - name: Build ffmpeg
+        env:
+          FFMPEG_TARBALL: ffmpeg-${{ env.FFMPEG_VERSION }}.tar.xz
         run: |
           mkdir -p embed/ffmpeg
-          curl -L -o ffmpeg.tar.xz "https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz"
-          tar xf ffmpeg.tar.xz
-          cd "ffmpeg-${FFMPEG_VERSION}"
-          ../scripts/ffmpeg-configure.sh \
-            --prefix="$(pwd)/out" \
-            --extra-ldflags="-static" \
-            --cc="ccache gcc"
-          make -j$(nproc)
-          cp ffmpeg ../embed/ffmpeg/ffmpeg_linux_arm64
-          strip ../embed/ffmpeg/ffmpeg_linux_arm64 || true
+          ./scripts/build-ffmpeg.sh embed/ffmpeg/ffmpeg_linux_arm64 --cc="ccache gcc"
 
       - name: Show ccache stats
         run: ccache -s
@@ -160,18 +183,21 @@ jobs:
           path: ${{ env.ARCHIVE_NAME }}
 
   build-macos:
-    needs: release-please
+    needs: [release-please, download-ffmpeg]
     if: ${{ needs.release-please.outputs.release_created }}
     runs-on: macos-latest
-    env:
-      FFMPEG_VERSION: "8.0"
     steps:
       - uses: actions/checkout@v4
+
+      - name: Download ffmpeg source
+        uses: actions/download-artifact@v4
+        with:
+          name: ffmpeg-source
 
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.25.6'
+          go-version: ${{ env.GO_VERSION }}
 
       - name: Install build dependencies
         run: |
@@ -191,20 +217,12 @@ jobs:
           ccache --set-config=compression=true
           ccache -z
 
-      - name: Build ffmpeg from source
+      - name: Build ffmpeg
+        env:
+          FFMPEG_TARBALL: ffmpeg-${{ env.FFMPEG_VERSION }}.tar.xz
         run: |
           mkdir -p embed/ffmpeg
-          curl -L -o ffmpeg.tar.xz "https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz"
-          tar xf ffmpeg.tar.xz
-          cd "ffmpeg-${FFMPEG_VERSION}"
-          ../scripts/ffmpeg-configure.sh \
-            --prefix="$(pwd)/out" \
-            --cc="ccache clang" \
-            --extra-cflags="-I$(brew --prefix lame)/include" \
-            --extra-ldflags="-L$(brew --prefix lame)/lib"
-          make -j$(sysctl -n hw.ncpu)
-          cp ffmpeg ../embed/ffmpeg/ffmpeg_darwin_arm64
-          strip ../embed/ffmpeg/ffmpeg_darwin_arm64 || true
+          ./scripts/build-ffmpeg.sh embed/ffmpeg/ffmpeg_darwin_arm64 --cc="ccache clang"
 
       - name: Show ccache stats
         run: ccache -s
@@ -238,6 +256,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+          pattern: audio-extractor-*
 
       - name: Upload release assets
         env:

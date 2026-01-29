@@ -53,14 +53,14 @@ fi
 # Build ffmpeg for Linux platforms using Docker
 build_ffmpeg_linux() {
     local arch=$1
-    local output_name="ffmpeg_linux_${arch}"
+    local output_path="${EMBED_DIR}/ffmpeg_linux_${arch}"
     
-    if [[ -f "${EMBED_DIR}/${output_name}" ]]; then
-        echo "    ${output_name} already exists, skipping..."
+    if [[ -f "${output_path}" ]]; then
+        echo "    ffmpeg_linux_${arch} already exists, skipping..."
         return
     fi
     
-    echo "    Building ${output_name}..."
+    echo "    Building ffmpeg_linux_${arch} via Docker..."
     
     docker buildx build \
         --platform "linux/${arch}" \
@@ -70,65 +70,33 @@ build_ffmpeg_linux() {
         -f Dockerfile \
         .
     
-    cp ".tmp-ffmpeg-${arch}/opt/ffmpeg/bin/ffmpeg" "${EMBED_DIR}/${output_name}"
+    cp ".tmp-ffmpeg-${arch}/opt/ffmpeg/bin/ffmpeg" "${output_path}"
     rm -rf ".tmp-ffmpeg-${arch}"
     
-    echo "    Built ${output_name} ($(du -h "${EMBED_DIR}/${output_name}" | cut -f1))"
+    echo "    Built ffmpeg_linux_${arch} ($(du -h "${output_path}" | cut -f1))"
 }
 
-# Build ffmpeg for macOS using Homebrew (must run on macOS)
-build_ffmpeg_darwin() {
-    local output_name="ffmpeg_darwin_arm64"
+# Build ffmpeg for the current platform natively
+build_ffmpeg_native() {
+    local output_path="${EMBED_DIR}/ffmpeg_${CURRENT_OS}_${CURRENT_ARCH}"
     
-    if [[ -f "${EMBED_DIR}/${output_name}" ]]; then
-        echo "    ${output_name} already exists, skipping..."
+    if [[ -f "${output_path}" ]]; then
+        echo "    ffmpeg_${CURRENT_OS}_${CURRENT_ARCH} already exists, skipping..."
         return
     fi
     
-    if [[ "$(uname -s)" != "Darwin" ]]; then
-        echo "    WARNING: Cannot build ${output_name} - not running on macOS"
-        echo "    You'll need to build this on an Apple Silicon Mac"
-        return
+    # Install build dependencies on macOS
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+        if ! command -v brew &> /dev/null; then
+            echo "    ERROR: Homebrew not found. Install from https://brew.sh"
+            exit 1
+        fi
+        brew list nasm &>/dev/null || brew install nasm
+        brew list pkg-config &>/dev/null || brew install pkg-config
+        brew list lame &>/dev/null || brew install lame
     fi
     
-    echo "    Building ${output_name} (this requires Homebrew)..."
-    
-    # Check for required build tools
-    if ! command -v brew &> /dev/null; then
-        echo "    ERROR: Homebrew not found. Install from https://brew.sh"
-        exit 1
-    fi
-    
-    # Install build dependencies if needed
-    brew list nasm &>/dev/null || brew install nasm
-    brew list pkg-config &>/dev/null || brew install pkg-config
-    brew list lame &>/dev/null || brew install lame
-    
-    # Build ffmpeg from source with minimal config
-    FFMPEG_BUILD_DIR=$(mktemp -d)
-    trap "rm -rf ${FFMPEG_BUILD_DIR}" EXIT
-    
-    cd "${FFMPEG_BUILD_DIR}"
-    curl -L -o ffmpeg.tar.xz "https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz"
-    tar xf ffmpeg.tar.xz
-    cd "ffmpeg-${FFMPEG_VERSION}"
-    
-    # Use shared configure script
-    "${SCRIPT_DIR}/scripts/ffmpeg-configure.sh" \
-        --prefix="${FFMPEG_BUILD_DIR}/out" \
-        --extra-cflags="-I$(brew --prefix lame)/include" \
-        --extra-ldflags="-L$(brew --prefix lame)/lib"
-    
-    make -j"$(sysctl -n hw.ncpu)"
-    
-    cp ffmpeg "${SCRIPT_DIR}/${EMBED_DIR}/${output_name}"
-    strip "${SCRIPT_DIR}/${EMBED_DIR}/${output_name}" || true
-    
-    cd "${SCRIPT_DIR}"
-    trap - EXIT
-    rm -rf "${FFMPEG_BUILD_DIR}"
-    
-    echo "    Built ${output_name} ($(du -h "${EMBED_DIR}/${output_name}" | cut -f1))"
+    "${SCRIPT_DIR}/scripts/build-ffmpeg.sh" "${output_path}"
 }
 
 # Ensure embed directory exists
@@ -141,10 +109,14 @@ echo "==> Building ffmpeg binaries..."
 for platform in "${PLATFORMS[@]}"; do
     os="${platform%/*}"
     arch="${platform#*/}"
-    if [[ "${os}" == "linux" ]]; then
+    if [[ "${os}" == "${CURRENT_OS}" && "${arch}" == "${CURRENT_ARCH}" ]]; then
+        # Native build for current platform
+        build_ffmpeg_native
+    elif [[ "${os}" == "linux" ]]; then
+        # Cross-compile Linux via Docker
         build_ffmpeg_linux "${arch}"
-    elif [[ "${os}" == "darwin" ]]; then
-        build_ffmpeg_darwin
+    else
+        echo "    Skipping ${os}/${arch} - can only build natively on that platform"
     fi
 done
 
