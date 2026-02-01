@@ -49,7 +49,7 @@ jobs:
         run: ./scripts/download-ffmpeg.sh
 
       - name: Upload ffmpeg source artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ffmpeg-source
           path: ffmpeg.tar.xz
@@ -63,7 +63,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Download ffmpeg source
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: ffmpeg-source
 
@@ -116,7 +116,7 @@ jobs:
           echo "ARCHIVE_NAME=${ARCHIVE_NAME}" >> $GITHUB_ENV
 
       - name: Upload release artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: audio-extractor-linux-x64
           path: ${{ env.ARCHIVE_NAME }}
@@ -129,7 +129,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Download ffmpeg source
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: ffmpeg-source
 
@@ -182,7 +182,7 @@ jobs:
           echo "ARCHIVE_NAME=${ARCHIVE_NAME}" >> $GITHUB_ENV
 
       - name: Upload release artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: audio-extractor-linux-arm64
           path: ${{ env.ARCHIVE_NAME }}
@@ -195,7 +195,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Download ffmpeg source
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: ffmpeg-source
 
@@ -249,7 +249,7 @@ jobs:
           echo "ARCHIVE_NAME=${ARCHIVE_NAME}" >> $GITHUB_ENV
 
       - name: Upload release artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: audio-extractor-macos-arm64
           path: ${{ env.ARCHIVE_NAME }}
@@ -260,7 +260,7 @@ jobs:
     runs-on: blacksmith-2vcpu-ubuntu-2404
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           path: artifacts
           pattern: audio-extractor-*
@@ -287,7 +287,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Download ffmpeg source
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: ffmpeg-source
 
@@ -331,7 +331,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Download ffmpeg source
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: ffmpeg-source
 
