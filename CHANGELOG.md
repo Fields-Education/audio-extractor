@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.2](https://github.com/Fields-Education/audio-extractor/compare/v1.5.1...v1.5.2) (2026-02-01)
+
+
+### Performance Improvements
+
+* use Blacksmith 2vcpu runners for lightweight jobs ([6460d79](https://github.com/Fields-Education/audio-extractor/commit/6460d790c1f66fc98c62b95bb72971af3868fff3))
+
 ## [1.5.1](https://github.com/Fields-Education/audio-extractor/compare/v1.5.0...v1.5.1) (2026-01-29)
 
 
