@@ -50,9 +50,11 @@ set -eu
     \
     --enable-encoder=pcm_s16le \
     --enable-encoder=libmp3lame \
+    --enable-encoder=flac \
     \
     --enable-muxer=wav \
     --enable-muxer=mp3 \
+    --enable-muxer=flac \
     \
     --enable-filter=aresample \
     --enable-filter=aformat \

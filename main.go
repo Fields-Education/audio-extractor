@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -76,10 +77,6 @@ func buildAudioFilter(filterMask int) string {
 	return strings.Join(filters, ",")
 }
 
-func convertToWavPcm16(r io.Reader) ([]byte, error) {
-	return convertToWavPcm16WithCleanup(r, 0)
-}
-
 func ffmpegLogLevel() string {
 	if verbose {
 		return "info"
@@ -95,14 +92,14 @@ func runFFmpegWithTempInput(r io.Reader, outputArgs []string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temp file: %w", err)
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = os.Remove(tmpFile.Name()) }() // Best-effort cleanup
 
 	// Write input to temp file
 	if _, err := io.Copy(tmpFile, r); err != nil {
-		tmpFile.Close()
+		_ = tmpFile.Close() // Explicitly ignore close error in error path
 		return nil, fmt.Errorf("failed to write input: %w", err)
 	}
-	tmpFile.Close() // Close before ffmpeg reads it
+	_ = tmpFile.Close() // Close before ffmpeg reads it, ignore error
 
 	// Build ffmpeg args with file input instead of pipe
 	args := []string{
@@ -112,7 +109,11 @@ func runFFmpegWithTempInput(r io.Reader, outputArgs []string) ([]byte, error) {
 	args = append(args, outputArgs...)
 	args = append(args, "pipe:1")
 
-	cmd := exec.Command(ffmpegPath, args...)
+	// Add timeout to prevent hung ffmpeg processes
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, ffmpegPath, args...)
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -146,10 +147,6 @@ func convertToWavPcm16WithCleanup(r io.Reader, filterMask int) ([]byte, error) {
 	return runFFmpegWithTempInput(r, outputArgs)
 }
 
-func convertToMp3(r io.Reader) ([]byte, error) {
-	return convertToMp3WithCleanup(r, 0)
-}
-
 func convertToMp3WithCleanup(r io.Reader, filterMask int) ([]byte, error) {
 	var outputArgs []string
 
@@ -167,10 +164,6 @@ func convertToMp3WithCleanup(r io.Reader, filterMask int) ([]byte, error) {
 	)
 
 	return runFFmpegWithTempInput(r, outputArgs)
-}
-
-func convertToFlac(r io.Reader) ([]byte, error) {
-	return convertToFlacWithCleanup(r, 0)
 }
 
 func convertToFlacWithCleanup(r io.Reader, filterMask int) ([]byte, error) {
@@ -197,7 +190,7 @@ func parseFilterMask(filterParam string) int {
 		return 0
 	}
 
-	if filterParam == "true" || filterParam == "1" || filterParam == "all" {
+	if filterParam == "true" || filterParam == "all" {
 		return FilterAll
 	}
 
@@ -206,11 +199,59 @@ func parseFilterMask(filterParam string) int {
 		return 0
 	}
 
-	return mask
+	// Mask to valid filter bits to prevent overflow and invalid values
+	return mask & (FilterAll | FilterDenoiserSpeechMode)
+}
+
+var maxUploadSize int64 = 250 << 20 // 250MB default
+
+// parseByteSize parses strings like "250MB", "1GB", "500" (bytes)
+func parseByteSize(s string) (int64, error) {
+	s = strings.TrimSpace(strings.ToUpper(s))
+	if s == "" {
+		return 0, fmt.Errorf("empty size string")
+	}
+
+	multiplier := int64(1)
+	switch {
+	case strings.HasSuffix(s, "GB"):
+		multiplier = 1 << 30
+		s = strings.TrimSuffix(s, "GB")
+	case strings.HasSuffix(s, "MB"):
+		multiplier = 1 << 20
+		s = strings.TrimSuffix(s, "MB")
+	case strings.HasSuffix(s, "KB"):
+		multiplier = 1 << 10
+		s = strings.TrimSuffix(s, "KB")
+	}
+
+	s = strings.TrimSpace(s)
+	value, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid size value: %w", err)
+	}
+
+	// Reject negative values
+	if value <= 0 {
+		return 0, fmt.Errorf("size must be positive")
+	}
+
+	// Check for overflow before multiplication
+	if multiplier > 1 && value > (1<<63-1)/multiplier {
+		return 0, fmt.Errorf("size value too large: overflow")
+	}
+
+	return value * multiplier, nil
 }
 
 func convertHandler(w http.ResponseWriter, r *http.Request) {
-	defer r.Body.Close()
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, maxUploadSize)
+	defer func() { _ = r.Body.Close() }() // Explicitly ignore close error
 
 	format := r.URL.Query().Get("format")
 	if format == "" {
@@ -247,12 +288,22 @@ func convertHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", contentType)
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(http.StatusOK)
-	w.Write(data)
+	if _, err := w.Write(data); err != nil {
+		log.Printf("failed to write response: %v", err)
+	}
 }
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("ok"))
+	if r.Method == http.MethodGet {
+		if _, err := w.Write([]byte("ok")); err != nil {
+			log.Printf("failed to write health response: %v", err)
+		}
+	}
 }
 
 func main() {
@@ -278,6 +329,16 @@ func main() {
 		verbose = true
 	}
 
+	// Parse max upload size from env var
+	if uploadSize := os.Getenv("MAX_UPLOAD_SIZE"); uploadSize != "" {
+		size, err := parseByteSize(uploadSize)
+		if err != nil {
+			log.Printf("warning: invalid MAX_UPLOAD_SIZE '%s', using default 250MB: %v", uploadSize, err)
+		} else if size > 0 {
+			maxUploadSize = size
+		}
+	}
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/convert", convertHandler)
 	mux.HandleFunc("/health", healthHandler)
@@ -285,9 +346,13 @@ func main() {
 		Addr:              ":" + port,
 		Handler:           mux,
 		ReadHeaderTimeout: 15 * time.Second,
+		ReadTimeout:       5 * time.Minute,
+		WriteTimeout:      5 * time.Minute,
+		IdleTimeout:       120 * time.Second,
 	}
 	if verbose {
 		log.Printf("verbose logging enabled")
+		log.Printf("max upload size: %d MB", maxUploadSize/(1<<20))
 	}
 	log.Printf("audio-extractor %s listening on :%s", version, port)
 	log.Fatal(srv.ListenAndServe())

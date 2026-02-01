@@ -4,25 +4,21 @@ Audio conversion optimized for Dual Language Immersion classroom recordings with
 
 ## Quick Start
 
-```typescript
-import {
-  DLIStudentPresets,
-  selectPresetAuto,
-  buildConversionQuery,
-} from '@f/server/cloudflare/containers/audio-extractor';
+```bash
+# Convert an audio file to WAV format with no filters (default)
+curl -X POST http://localhost:8080/convert?format=wav \
+  --data-binary @input.mp3 \
+  --output output.wav
 
-// Auto-detect best preset (recommended)
-const filters = selectPresetAuto();
+# Convert with ClassroomChromebook preset (111) - recommended for classroom recordings
+curl -X POST "http://localhost:8080/convert?format=wav&filters=111" \
+  --data-binary @input.mp3 \
+  --output output.wav
 
-// Or use specific preset
-const filters = DLIStudentPresets.ClassroomChromebook; // Default for classroom
-
-// Convert audio
-const query = buildConversionQuery({format: 'wav', filters});
-const response = await fetch(`${containerUrl}/convert?${query}`, {
-  method: 'POST',
-  body: audioFile,
-});
+# Convert to MP3 with basic cleanup filters (7)
+curl -X POST "http://localhost:8080/convert?format=mp3&filters=7" \
+  --data-binary @input.mp3 \
+  --output output.mp3
 ```
 
 ## API
@@ -32,7 +28,7 @@ const response = await fetch(`${containerUrl}/convert?${query}`, {
 **Query Parameters:**
 
 - `format` - Output format: `wav` (default), `mp3`, or `flac`
-- `filters` - Filter bitmask (see Filter Bitmask below)
+- `filters` - Filter bitmask or keyword: `all`/`true` enables all filters (see Filter Bitmask below)
 
 **Output Specs:**
 
@@ -72,10 +68,15 @@ Combine filters using bitwise OR (addition):
 
 Optimized for Dual Language Immersion (Chinese) classroom scenarios with fragmented speech, background students, and varying recording quality.
 
-### ClassroomChromebook (111) - **DEFAULT**
+### ClassroomChromebook (111) - **Recommended for Classroom**
 
-```typescript
-const filters = DLIStudentPresets.ClassroomChromebook; // 111
+**Value:** `111`
+
+```bash
+# Use with curl
+curl -X POST "http://localhost:8080/convert?format=wav&filters=111" \
+  --data-binary @input.mp3 \
+  --output output.wav
 ```
 
 **Best for:** Chromebook recordings in classroom (most common scenario)
@@ -99,8 +100,11 @@ const filters = DLIStudentPresets.ClassroomChromebook; // 111
 
 ### ClassroomSafe (47) - Fallback
 
-```typescript
-const filters = DLIStudentPresets.ClassroomSafe; // 47
+```bash
+# Use filter value 47 (no speech mode)
+curl -X POST "http://localhost:8080/convert?format=wav&filters=47" \
+  --data-binary @input.mp3 \
+  --output output.wav
 ```
 
 **Best for:** Same as ClassroomChromebook but more predictable processing
@@ -120,8 +124,11 @@ const filters = DLIStudentPresets.ClassroomSafe; // 47
 
 ### PhoneMobile (39)
 
-```typescript
-const filters = DLIStudentPresets.PhoneMobile; // 39
+```bash
+# Use filter value 39 for phone recordings
+curl -X POST "http://localhost:8080/convert?format=wav&filters=39" \
+  --data-binary @input.mp3 \
+  --output output.wav
 ```
 
 **Best for:** iPhone/Android recordings
@@ -136,8 +143,11 @@ const filters = DLIStudentPresets.PhoneMobile; // 39
 
 ### HomeQuiet (36)
 
-```typescript
-const filters = DLIStudentPresets.HomeQuiet; // 36
+```bash
+# Use filter value 36 for minimal processing
+curl -X POST "http://localhost:8080/convert?format=wav&filters=36" \
+  --data-binary @input.mp3 \
+  --output output.wav
 ```
 
 **Best for:** Quiet home recordings (best quality scenario)
@@ -152,8 +162,11 @@ const filters = DLIStudentPresets.HomeQuiet; // 36
 
 ### HomeNoisy (39)
 
-```typescript
-const filters = DLIStudentPresets.HomeNoisy; // 39
+```bash
+# Use filter value 39 for noisy home environments
+curl -X POST "http://localhost:8080/convert?format=wav&filters=39" \
+  --data-binary @input.mp3 \
+  --output output.wav
 ```
 
 **Best for:** Home recordings with TV/family in background
@@ -167,8 +180,11 @@ const filters = DLIStudentPresets.HomeNoisy; // 39
 
 ### ClassroomVeryNoisy (127) - Use Sparingly
 
-```typescript
-const filters = DLIStudentPresets.ClassroomVeryNoisy; // 127
+```bash
+# Use filter value 127 for maximum noise reduction
+curl -X POST "http://localhost:8080/convert?format=wav&filters=127" \
+  --data-binary @input.mp3 \
+  --output output.wav
 ```
 
 **Best for:** Extremely noisy classrooms (30+ students)
@@ -239,131 +255,48 @@ filters=68  → Denoiser with speech mode (nt=s) - adaptive processing (4+64)
 - Frame-based dynamic normalization
 - Prevents clipping, boosts quiet sections
 
-## Auto-Detection
-
-Let the service automatically select the best preset:
-
-```typescript
-import {selectPresetAuto} from '@f/server/cloudflare/containers/audio-extractor';
-
-// Auto-detect from browser user agent
-const filters = selectPresetAuto();
-
-// Explicitly specify environment
-const filters = selectPresetAuto({environment: 'classroom'});
-
-// Use microphone noise level analysis (0-1)
-const filters = selectPresetAuto({noiseLevel: 0.7});
-```
-
-**Detection logic:**
-
-1. If Chromebook user agent → ClassroomChromebook (111)
-2. If phone user agent → PhoneMobile (39)
-3. If desktop + high noise → HomeNoisy (39)
-4. Otherwise → HomeQuiet (36)
-
-## Helper Functions
-
-```typescript
-import {
-  getPresetLabel,
-  getFilterNames,
-  getEstimatedProcessingTime,
-  buildConversionQuery,
-  validateFilterMask,
-} from '@f/server/cloudflare/containers/audio-extractor';
-
-// Get human-readable preset name
-getPresetLabel(111); // "Classroom (Chromebook)"
-
-// Get list of enabled filters
-getFilterNames(111); // ['Highpass', 'Lowpass', 'Denoiser (speech mode)', 'Declick', 'Normalize']
-
-// Estimate processing time
-getEstimatedProcessingTime(111, 60); // { min: 1.5, max: 2.5 }
-
-// Build URL query string
-buildConversionQuery({format: 'wav', filters: 111}); // "format=wav&filters=111"
-
-// Validate filter mask
-const result = validateFilterMask(111);
-if (!result.valid) {
-  console.error(result.error);
-}
-```
-
-### Preset Information
-
-```typescript
-import {
-  getPresetLabel,
-  getFilterNames,
-  getEstimatedProcessingTime,
-} from '@f/server/cloudflare/containers/audio-extractor';
-
-getPresetLabel(111); // "Classroom (Chromebook)"
-getFilterNames(111); // ['Highpass', 'Lowpass', 'Denoiser (speech mode)', 'Declick', 'Normalize']
-getEstimatedProcessingTime(111, 60); // { min: 1.5, max: 2.5 }
-```
-
-### Validation
-
-```typescript
-import {validateFilterMask} from '@f/server/cloudflare/containers/audio-extractor';
-
-const result = validateFilterMask(111);
-if (!result.valid) {
-  console.error(result.error);
-}
-```
-
 ## Examples
 
-### Basic Conversion
+### Basic Conversion (cURL)
 
-```typescript
-const response = await fetch(`${url}/convert?format=wav`, {
-  method: 'POST',
-  body: audioFile,
-});
+```bash
+# Convert to WAV (default, no filters)
+curl -X POST http://localhost:8080/convert?format=wav \
+  --data-binary @input.mp3 \
+  --output output.wav
+
+# Convert to MP3 with basic cleanup
+curl -X POST "http://localhost:8080/convert?format=mp3&filters=7" \
+  --data-binary @input.mp3 \
+  --output output.mp3
 ```
 
 ### With Custom Filters
 
-```typescript
-// Highpass + Denoiser + Normalize (1 + 4 + 32 = 37)
-const filters = 37;
-const response = await fetch(`${url}/convert?format=wav&filters=${filters}`, {
-  method: 'POST',
-  body: audioFile,
-});
+```bash
+# Highpass + Denoiser + Normalize (1 + 4 + 32 = 37)
+curl -X POST "http://localhost:8080/convert?format=wav&filters=37" \
+  --data-binary @input.mp3 \
+  --output output.wav
 ```
 
-### React Hook
+### JavaScript/TypeScript Example
 
 ```typescript
-import {useState} from 'react';
-import {buildConversionQuery} from '@f/server/cloudflare/containers/audio-extractor';
-
-function useAudioConverter(containerUrl: string) {
-  const [isConverting, setIsConverting] = useState(false);
-
-  const convert = async (file: File, filters: number = 0) => {
-    setIsConverting(true);
-    try {
-      const query = buildConversionQuery({format: 'wav', filters});
-      const response = await fetch(`${containerUrl}/convert?${query}`, {
-        method: 'POST',
-        body: file,
-      });
-      return await response.blob();
-    } finally {
-      setIsConverting(false);
-    }
-  };
-
-  return {convert, isConverting};
+async function convertAudio(file: File, filters: number = 0): Promise<Blob> {
+  const format = 'wav';
+  const query = new URLSearchParams({ format, filters: filters.toString() });
+  
+  const response = await fetch(`http://localhost:8080/convert?${query}`, {
+    method: 'POST',
+    body: file,
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Conversion failed: ${response.statusText}`);
+  }
+  
+  return response.blob();
 }
 ```
 
@@ -371,7 +304,7 @@ function useAudioConverter(containerUrl: string) {
 
 - MP3, AAC, OGG (Vorbis, Opus)
 - FLAC, WAV (PCM)
-- MP4/M4A, WebM, Matroska (MKV)
+- MP4/M4A/MOV, WebM, Matroska (MKV)
 
 ## Performance
 
@@ -388,13 +321,69 @@ Times scale linearly with audio duration.
 
 ## Building & Running
 
+### Docker (Recommended for Production)
+
 ```bash
 # Build
 docker build -t ffmpeg-audio-extractor .
 
 # Run
 docker run -d -p 8080:8080 ffmpeg-audio-extractor
+
+# Run with verbose logging
+docker run -d -p 8080:8080 -e VERBOSE=true ffmpeg-audio-extractor
+
+# Run with increased upload size limit (e.g., for large video files)
+docker run -d -p 8080:8080 -e MAX_UPLOAD_SIZE=1GB ffmpeg-audio-extractor
 ```
+
+### Standalone Binary (Development)
+
+```bash
+# Build ffmpeg and the standalone binary for current platform
+./build-standalone.sh --local
+
+# Run (binary will be in dist/, includes platform suffix)
+./dist/audio-extractor-$(go env GOOS)-$(go env GOARCH)
+
+# Run with verbose logging
+./dist/audio-extractor-$(go env GOOS)-$(go env GOARCH) -verbose
+```
+
+## Configuration
+
+### Command Line Flags
+
+| Flag | Description |
+|------|-------------|
+| `--version` | Print version information and exit |
+| `--verbose`, `-v` | Enable verbose logging of ffmpeg output |
+
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `PORT` | HTTP server port | `8080` |
+| `VERBOSE` | Enable verbose logging (`true` or `1`) | `false` |
+| `MAX_UPLOAD_SIZE` | Maximum upload size (e.g., `250MB`, `1GB`, `524288000`) | `250MB` |
+
+### Limits
+
+- **Maximum upload size:** 250MB (configurable via `MAX_UPLOAD_SIZE`)
+- **Processing timeout:** 5 minutes
+- **Supported formats:** MP3, AAC, OGG, FLAC, WAV, MP4/M4A, WebM, MKV
+
+## Security Considerations
+
+⚠️ **This service is designed to run behind a reverse proxy with authentication.**
+
+- No built-in authentication - secure at the proxy level (nginx, traefik, etc.)
+- File size limits enforced (250MB default, configurable via MAX_UPLOAD_SIZE)
+- Processing timeouts prevent resource exhaustion
+- Temporary files are securely created and cleaned up
+- FFmpeg runs with minimal privileges in Docker (scratch image)
+
+**Recommended deployment:** Place behind a reverse proxy with rate limiting and authentication.
 
 ## Technical Details
 
@@ -421,6 +410,7 @@ Speech mode uses these natural pauses to learn the noise profile and applies dif
 
 ## Source Code
 
-- **[filters.ts](./filters.ts)** - TypeScript constants and helper functions
-- **[index.ts](./index.ts)** - Container class with inline documentation
-- **[main.go](./main.go)** - Go server implementation
+- **[main.go](./main.go)** - Go HTTP server with audio conversion endpoints
+- **[ffmpeg_docker.go](./ffmpeg_docker.go)** - Docker build initialization (uses system ffmpeg)
+- **[ffmpeg_embedded.go](./ffmpeg_embedded.go)** - Embedded ffmpeg binary extraction for standalone builds
+- **[scripts/](./scripts/)** - Build scripts for ffmpeg and Docker
