@@ -35,6 +35,7 @@ set -eu
     \
     --enable-decoder=aac \
     --enable-decoder=aac_latm \
+    --enable-decoder=alac \
     --enable-decoder=mp3 \
     --enable-decoder=mp3float \
     --enable-decoder=mp3on4 \
@@ -43,16 +44,23 @@ set -eu
     --enable-decoder=opus \
     --enable-decoder=flac \
     --enable-decoder=pcm_s16le \
+    --enable-decoder=pcm_s16be \
     --enable-decoder=pcm_s24le \
+    --enable-decoder=pcm_s24be \
     --enable-decoder=pcm_s32le \
+    --enable-decoder=pcm_s32be \
     --enable-decoder=pcm_f32le \
+    --enable-decoder=pcm_f32be \
     --enable-decoder=pcm_f64le \
+    --enable-decoder=pcm_f64be \
     \
     --enable-encoder=pcm_s16le \
     --enable-encoder=libmp3lame \
+    --enable-encoder=flac \
     \
     --enable-muxer=wav \
     --enable-muxer=mp3 \
+    --enable-muxer=flac \
     \
     --enable-filter=aresample \
     --enable-filter=aformat \
