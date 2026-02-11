@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.0](https://github.com/Fields-Education/audio-extractor/compare/v1.5.2...v1.6.0) (2026-02-11)
+
+
+### Features
+
+* update Go version to 1.26.0 ([#21](https://github.com/Fields-Education/audio-extractor/issues/21)) ([aecfaf6](https://github.com/Fields-Education/audio-extractor/commit/aecfaf6598c49f6ad441aea1feb17465d4e9e6a7))
+
 ## [1.5.2](https://github.com/Fields-Education/audio-extractor/compare/v1.5.1...v1.5.2) (2026-02-01)
 
 
