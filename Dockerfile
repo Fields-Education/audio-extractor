@@ -46,7 +46,7 @@ RUN strip ${PREFIX}/bin/ffmpeg || true
 RUN rm -rf ${PREFIX}/share ${PREFIX}/include ${PREFIX}/lib
 
 # --- Stage 2: Build Go server ---
-FROM --platform=${BUILDPLATFORM} golang:1.25.7-alpine3.22 AS go-builder
+FROM --platform=${BUILDPLATFORM} golang:1.26.0-alpine3.22 AS go-builder
 ARG TARGETPLATFORM
 ARG TARGETOS
 ARG TARGETARCH
