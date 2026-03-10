@@ -68,7 +68,7 @@ jobs:
           name: ffmpeg-source
 
       - name: Mount ccache sticky disk
-        uses: useblacksmith/stickydisk@v1
+        uses: useblacksmith/stickydisk@v2
         with:
           key: ccache-linux-amd64-${{ env.FFMPEG_VERSION }}
           path: ~/.ccache
@@ -134,7 +134,7 @@ jobs:
           name: ffmpeg-source
 
       - name: Mount ccache sticky disk
-        uses: useblacksmith/stickydisk@v1
+        uses: useblacksmith/stickydisk@v2
         with:
           key: ccache-linux-arm64-${{ env.FFMPEG_VERSION }}
           path: ~/.ccache
