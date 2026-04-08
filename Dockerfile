@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.21
+# syntax=docker/dockerfile:1.23
 
 # --- Stage 1: Build ffmpeg (audio-only minimal) ---
 # Must build on target platform since FFmpeg can't easily cross-compile
@@ -46,7 +46,7 @@ RUN strip ${PREFIX}/bin/ffmpeg || true
 RUN rm -rf ${PREFIX}/share ${PREFIX}/include ${PREFIX}/lib
 
 # --- Stage 2: Build Go server ---
-FROM --platform=${BUILDPLATFORM} golang:1.26.0-alpine3.22 AS go-builder
+FROM --platform=${BUILDPLATFORM} golang:1.26.2-alpine3.22 AS go-builder
 ARG TARGETPLATFORM
 ARG TARGETOS
 ARG TARGETARCH

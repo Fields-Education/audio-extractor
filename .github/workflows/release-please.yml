@@ -9,7 +9,7 @@ env:
   # renovate: datasource=github-releases depName=FFmpeg/FFmpeg extractVersion=^n(?<version>.*)$
   FFMPEG_VERSION: "8.0"
   # renovate: datasource=docker depName=golang
-  GO_VERSION: "1.26.0"
+  GO_VERSION: "1.26.2"
 
 permissions:
   contents: write
