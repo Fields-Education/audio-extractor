@@ -21,7 +21,7 @@ curl -X POST "http://localhost:8080/convert?format=mp3&filters=7" \
   --output output.mp3
 
 # Extract the first non-black frame from a video as a JPEG poster
-curl -X POST "http://localhost:8080/convert?format=thumbnail" \
+curl -X POST "http://localhost:8080/convert?format=poster" \
   --data-binary @input.mp4 \
   --output poster.jpg
 ```
@@ -32,7 +32,7 @@ curl -X POST "http://localhost:8080/convert?format=thumbnail" \
 
 **Query Parameters:**
 
-- `format` - Output format: `wav` (default), `mp3`, `flac`, or `thumbnail`/`poster`/`jpg`/`jpeg`
+- `format` - Output format: `wav` (default), `mp3`, `flac`, or `poster`/`jpg`/`jpeg`
 - `filters` - Filter bitmask or keyword: `all`/`true` enables all filters (see Filter Bitmask below)
 
 **Output Specs:**
@@ -40,7 +40,7 @@ curl -X POST "http://localhost:8080/convert?format=thumbnail" \
 - Sample rate: 16000 Hz
 - Channels: Mono
 - Bit depth: 16-bit (WAV/FLAC) or 128kbps (MP3)
-- Thumbnail output: JPEG image from the first non-black video frame, scaled to 1280px wide
+- Poster output: JPEG image from the first non-black video frame, scaled to 1280px wide
 
 ### GET /health
 

@@ -185,7 +185,7 @@ func convertToFlacWithCleanup(r io.Reader, filterMask int) ([]byte, error) {
 	return runFFmpegWithTempInput(r, outputArgs)
 }
 
-func extractJpegThumbnailWithCleanup(r io.Reader) ([]byte, error) {
+func extractJpegPosterWithCleanup(r io.Reader) ([]byte, error) {
 	outputArgs := []string{
 		"-map", "0:v:0",
 		"-frames:v", "1",
@@ -296,8 +296,8 @@ func convertHandler(w http.ResponseWriter, r *http.Request) {
 	case "flac":
 		data, err = convertToFlacWithCleanup(r.Body, filterMask)
 		contentType = "audio/flac"
-	case "jpg", "jpeg", "poster", "thumbnail":
-		data, err = extractJpegThumbnailWithCleanup(r.Body)
+	case "jpg", "jpeg", "poster":
+		data, err = extractJpegPosterWithCleanup(r.Body)
 		contentType = "image/jpeg"
 	default:
 		http.Error(w, fmt.Sprintf("unsupported format: %s", format), http.StatusBadRequest)
