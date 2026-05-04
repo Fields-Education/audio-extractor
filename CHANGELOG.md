@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.0](https://github.com/Fields-Education/audio-extractor/compare/v1.6.0...v1.7.0) (2026-05-04)
+
+
+### Features
+
+* add video poster extraction ([#27](https://github.com/Fields-Education/audio-extractor/issues/27)) ([549dd7d](https://github.com/Fields-Education/audio-extractor/commit/549dd7d8b75baa319fb6a8c94f21bed4215ee33f))
+
 ## [1.6.0](https://github.com/Fields-Education/audio-extractor/compare/v1.5.2...v1.6.0) (2026-02-11)
 
 
