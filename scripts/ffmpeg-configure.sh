@@ -42,6 +42,12 @@ set -eu
     --enable-decoder=mp3on4float \
     --enable-decoder=vorbis \
     --enable-decoder=opus \
+    --enable-decoder=h264 \
+    --enable-decoder=hevc \
+    --enable-decoder=mpeg4 \
+    --enable-decoder=vp8 \
+    --enable-decoder=vp9 \
+    --enable-decoder=av1 \
     --enable-decoder=flac \
     --enable-decoder=pcm_s16le \
     --enable-decoder=pcm_s16be \
@@ -57,11 +63,16 @@ set -eu
     --enable-encoder=pcm_s16le \
     --enable-encoder=libmp3lame \
     --enable-encoder=flac \
+    --enable-encoder=mjpeg \
     \
     --enable-muxer=wav \
     --enable-muxer=mp3 \
     --enable-muxer=flac \
+    --enable-muxer=image2pipe \
     \
+    --enable-filter=blackframe \
+    --enable-filter=metadata \
+    --enable-filter=scale \
     --enable-filter=aresample \
     --enable-filter=aformat \
     --enable-filter=highpass \
@@ -75,6 +86,12 @@ set -eu
     --enable-parser=mp3 \
     --enable-parser=vorbis \
     --enable-parser=opus \
+    --enable-parser=h264 \
+    --enable-parser=hevc \
+    --enable-parser=mpeg4video \
+    --enable-parser=vp8 \
+    --enable-parser=vp9 \
+    --enable-parser=av1 \
     --enable-parser=flac \
     \
     "$@"

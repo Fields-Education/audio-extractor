@@ -185,6 +185,28 @@ func convertToFlacWithCleanup(r io.Reader, filterMask int) ([]byte, error) {
 	return runFFmpegWithTempInput(r, outputArgs)
 }
 
+func extractJpegPosterWithCleanup(r io.Reader) ([]byte, error) {
+	outputArgs := []string{
+		"-map", "0:v:0",
+		"-frames:v", "1",
+		"-an",
+		"-vf", "blackframe=amount=0:threshold=32,metadata=select:key=lavfi.blackframe.pblack:value=98:function=less,scale=1280:-2",
+		"-f", "image2pipe",
+		"-vcodec", "mjpeg",
+		"-q:v", "3",
+	}
+
+	data, err := runFFmpegWithTempInput(r, outputArgs)
+	if err != nil {
+		return nil, err
+	}
+	if len(data) == 0 {
+		return nil, fmt.Errorf("no non-black video frame found")
+	}
+
+	return data, nil
+}
+
 func parseFilterMask(filterParam string) int {
 	if filterParam == "" {
 		return 0
@@ -274,6 +296,9 @@ func convertHandler(w http.ResponseWriter, r *http.Request) {
 	case "flac":
 		data, err = convertToFlacWithCleanup(r.Body, filterMask)
 		contentType = "audio/flac"
+	case "jpg", "jpeg", "poster":
+		data, err = extractJpegPosterWithCleanup(r.Body)
+		contentType = "image/jpeg"
 	default:
 		http.Error(w, fmt.Sprintf("unsupported format: %s", format), http.StatusBadRequest)
 		return
