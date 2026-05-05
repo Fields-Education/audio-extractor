@@ -27,8 +27,8 @@ jobs:
       - uses: googleapis/release-please-action@v5
         id: release
         with:
-          release-type: go
-          prerelease: true
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
 
   download-ffmpeg:
     needs: release-please
@@ -413,4 +413,4 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release edit "${{ needs.release-please.outputs.tag_name }}" --repo ${{ github.repository }} --prerelease=false --latest
+          gh release edit "${{ needs.release-please.outputs.tag_name }}" --repo ${{ github.repository }} --draft=false --prerelease=false --latest
