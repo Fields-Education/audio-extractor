@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.1](https://github.com/Fields-Education/audio-extractor/compare/v1.7.0...v1.7.1) (2026-05-05)
+
+
+### Bug Fixes
+
+* publish releases after uploading assets ([#29](https://github.com/Fields-Education/audio-extractor/issues/29)) ([23f1bea](https://github.com/Fields-Education/audio-extractor/commit/23f1beab8910f1caf9b234fee5efc7d6c1f2436d))
+
 ## [1.7.0](https://github.com/Fields-Education/audio-extractor/compare/v1.6.0...v1.7.0) (2026-05-04)
 
 
