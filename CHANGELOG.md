@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.2](https://github.com/Fields-Education/audio-extractor/compare/v1.7.1...v1.7.2) (2026-05-06)
+
+
+### Bug Fixes
+
+* verify ffmpeg poster build support ([#33](https://github.com/Fields-Education/audio-extractor/issues/33)) ([91c8264](https://github.com/Fields-Education/audio-extractor/commit/91c8264999fc2ca42d728bae4c0cd9813482ff24))
+
 ## [1.7.1](https://github.com/Fields-Education/audio-extractor/compare/v1.7.0...v1.7.1) (2026-05-05)
 
 
