@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.23
 
-# --- Stage 1: Build ffmpeg (audio-only minimal) ---
+# --- Stage 1: Build ffmpeg (minimal audio conversion + poster extraction) ---
 # Must build on target platform since FFmpeg can't easily cross-compile
 FROM --platform=${TARGETPLATFORM} alpine:latest AS ffmpeg-builder
 ARG TARGETPLATFORM
@@ -19,6 +19,7 @@ ENV PATH=/usr/lib/ccache/bin:$PATH
 WORKDIR /build
 # Copy configure script and tarball (if present in build context)
 COPY scripts/ffmpeg-configure.sh /build/
+COPY scripts/verify-ffmpeg-components.sh /build/
 COPY ffmpeg.tar.x[z] /build/
 # Download if tarball wasn't provided
 ARG FFMPEG_VERSION=8.0
@@ -43,6 +44,8 @@ RUN --mount=type=cache,target=/root/.cache/ccache make -j"$(nproc)"
 RUN --mount=type=cache,target=/root/.cache/ccache ccache -s
 RUN make install
 RUN strip ${PREFIX}/bin/ffmpeg || true
+RUN /build/verify-ffmpeg-components.sh ${PREFIX}/bin/ffmpeg
+RUN mkdir -p /empty-tmp && chmod 1777 /empty-tmp
 RUN rm -rf ${PREFIX}/share ${PREFIX}/include ${PREFIX}/lib
 
 # --- Stage 2: Build Go server ---
@@ -70,8 +73,8 @@ ARG TARGETOS
 ARG TARGETARCH
 ARG BUILDPLATFORM
 ENV PATH=/usr/local/bin
+COPY --from=ffmpeg-builder /empty-tmp /tmp
 COPY --from=ffmpeg-builder /opt/ffmpeg/bin/ffmpeg /usr/local/bin/ffmpeg
 COPY --from=go-builder /out/server /usr/local/bin/server
 EXPOSE 8080
 CMD ["/usr/local/bin/server"]
-

@@ -116,4 +116,6 @@ echo "==> Installing to ${OUTPUT_PATH}..."
 cp ffmpeg "$OUTPUT_PATH"
 strip "$OUTPUT_PATH" 2>/dev/null || true
 
+"$SCRIPT_DIR/verify-ffmpeg-components.sh" "$OUTPUT_PATH"
+
 echo "==> Done! Built $(du -h "$OUTPUT_PATH" | cut -f1) binary"

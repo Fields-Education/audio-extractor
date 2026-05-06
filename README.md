@@ -394,6 +394,7 @@ docker run -d -p 8080:8080 -e MAX_UPLOAD_SIZE=1GB ffmpeg-audio-extractor
 ## Technical Details
 
 **FFmpeg Version:** 8.0 (released August 2025)
+**FFmpeg License:** GPL v2 or later (required for the `blackframe` poster filter)
 **Base Image:** Alpine Linux 3.22
 **Runtime:** Scratch (minimal)
 **Container Size:** ~15MB
