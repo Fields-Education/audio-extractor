@@ -42,6 +42,7 @@ set -eu
     --enable-decoder=mp3on4float \
     --enable-decoder=vorbis \
     --enable-decoder=opus \
+    --enable-decoder=vp8 \
     --enable-decoder=flac \
     --enable-decoder=pcm_s16le \
     --enable-decoder=pcm_s16be \
@@ -57,10 +58,12 @@ set -eu
     --enable-encoder=pcm_s16le \
     --enable-encoder=libmp3lame \
     --enable-encoder=flac \
+    --enable-encoder=mjpeg \
     \
     --enable-muxer=wav \
     --enable-muxer=mp3 \
     --enable-muxer=flac \
+    --enable-muxer=image2pipe \
     \
     --enable-filter=aresample \
     --enable-filter=aformat \
@@ -75,6 +78,7 @@ set -eu
     --enable-parser=mp3 \
     --enable-parser=vorbis \
     --enable-parser=opus \
+    --enable-parser=vp8 \
     --enable-parser=flac \
     \
     "$@"

@@ -40,6 +40,18 @@ curl -X POST "http://localhost:8080/convert?format=mp3&filters=7" \
 
 Health check endpoint - returns `200 OK` with body `ok`
 
+### POST /poster
+
+Extracts the first video frame from a WebM upload and returns it as a JPEG poster image.
+
+**Supported input:**
+
+- WebM video, including `Content-Type: video/webm;codecs=vp8,opus`
+
+**Output:**
+
+- `Content-Type: image/jpeg`
+
 ## Filter Bitmask
 
 Combine filters using bitwise OR (addition):
@@ -271,6 +283,15 @@ curl -X POST "http://localhost:8080/convert?format=mp3&filters=7" \
   --output output.mp3
 ```
 
+### Poster Extraction (cURL)
+
+```bash
+curl -X POST http://localhost:8080/poster \
+  -H "Content-Type: video/webm;codecs=vp8,opus" \
+  --data-binary @input.webm \
+  --output poster.jpg
+```
+
 ### With Custom Filters
 
 ```bash
@@ -302,9 +323,15 @@ async function convertAudio(file: File, filters: number = 0): Promise<Blob> {
 
 ## Supported Input Formats
 
+### Audio Conversion
+
 - MP3, AAC, OGG (Vorbis, Opus)
 - FLAC, WAV (PCM)
 - MP4/M4A/MOV, WebM, Matroska (MKV)
+
+### Poster Extraction
+
+- WebM with VP8 video, including MediaRecorder output using Opus audio
 
 ## Performance
 

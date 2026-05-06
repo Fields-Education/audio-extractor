@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"mime"
 	"net/http"
 	"os"
 	"os/exec"
@@ -185,6 +186,44 @@ func convertToFlacWithCleanup(r io.Reader, filterMask int) ([]byte, error) {
 	return runFFmpegWithTempInput(r, outputArgs)
 }
 
+func extractPosterJpeg(r io.Reader) ([]byte, error) {
+	return runFFmpegWithTempInput(r, []string{
+		"-map", "0:v:0",
+		"-frames:v", "1",
+		"-an",
+		"-f", "image2pipe",
+		"-vcodec", "mjpeg",
+		"-q:v", "2",
+	})
+}
+
+func normalizeMediaType(contentType string) string {
+	mediaType, _, err := mime.ParseMediaType(contentType)
+	if err == nil {
+		return strings.ToLower(mediaType)
+	}
+
+	// Browsers commonly emit unquoted codec parameters such as
+	// video/webm;codecs=vp8,opus, which mime.ParseMediaType rejects.
+	if semicolon := strings.Index(contentType, ";"); semicolon >= 0 {
+		contentType = contentType[:semicolon]
+	}
+	return strings.ToLower(strings.TrimSpace(contentType))
+}
+
+func isSupportedPosterContentType(contentType string) bool {
+	if strings.TrimSpace(contentType) == "" {
+		return true
+	}
+
+	switch normalizeMediaType(contentType) {
+	case "application/octet-stream", "video/webm":
+		return true
+	default:
+		return false
+	}
+}
+
 func parseFilterMask(filterParam string) int {
 	if filterParam == "" {
 		return 0
@@ -293,6 +332,35 @@ func convertHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func posterHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if !isSupportedPosterContentType(r.Header.Get("Content-Type")) {
+		http.Error(w, "unsupported input media type", http.StatusUnsupportedMediaType)
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, maxUploadSize)
+	defer func() { _ = r.Body.Close() }() // Explicitly ignore close error
+
+	data, err := extractPosterJpeg(r.Body)
+	if err != nil {
+		log.Printf("poster extraction error: %v", err)
+		http.Error(w, "poster extraction failed", http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "image/jpeg")
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(http.StatusOK)
+	if _, err := w.Write(data); err != nil {
+		log.Printf("failed to write response: %v", err)
+	}
+}
+
 func healthHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -341,6 +409,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/convert", convertHandler)
+	mux.HandleFunc("/poster", posterHandler)
 	mux.HandleFunc("/health", healthHandler)
 	srv := &http.Server{
 		Addr:              ":" + port,

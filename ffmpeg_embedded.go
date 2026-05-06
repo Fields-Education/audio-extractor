@@ -22,8 +22,16 @@ func init() {
 	var err error
 	ffmpegPath, err = extractFFmpeg()
 	if err != nil {
+		if runningUnderGoTest() {
+			ffmpegPath = "ffmpeg"
+			return
+		}
 		log.Fatalf("failed to extract ffmpeg: %v", err)
 	}
+}
+
+func runningUnderGoTest() bool {
+	return strings.HasSuffix(filepath.Base(os.Args[0]), ".test")
 }
 
 func extractFFmpeg() (string, error) {
