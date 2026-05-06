@@ -1,6 +1,7 @@
 #!/bin/sh
 # Shared ffmpeg configure flags for audio-extractor
-# This script runs ./configure with the minimal flags needed for audio extraction
+# This script runs ./configure with the minimal flags needed for audio conversion
+# and JPEG poster extraction.
 #
 # Usage: ./scripts/ffmpeg-configure.sh [extra-flags...]
 # Example: ./scripts/ffmpeg-configure.sh --prefix=/opt/ffmpeg --cc="ccache gcc"
@@ -17,6 +18,7 @@ set -eu
     --enable-static \
     --disable-shared \
     --enable-small \
+    --enable-gpl \
     \
     --enable-libmp3lame \
     \
@@ -24,9 +26,7 @@ set -eu
     --enable-protocol=pipe \
     \
     --enable-demuxer=matroska \
-    --enable-demuxer=webm \
     --enable-demuxer=mov \
-    --enable-demuxer=mp4 \
     --enable-demuxer=ogg \
     --enable-demuxer=flac \
     --enable-demuxer=wav \
@@ -72,6 +72,7 @@ set -eu
     \
     --enable-filter=blackframe \
     --enable-filter=metadata \
+    --enable-filter=format \
     --enable-filter=scale \
     --enable-filter=aresample \
     --enable-filter=aformat \
@@ -83,7 +84,7 @@ set -eu
     --enable-filter=dynaudnorm \
     \
     --enable-parser=aac \
-    --enable-parser=mp3 \
+    --enable-parser=mpegaudio \
     --enable-parser=vorbis \
     --enable-parser=opus \
     --enable-parser=h264 \
