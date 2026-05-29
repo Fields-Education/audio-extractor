@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.23
+# syntax=docker/dockerfile:1.24
 
 # --- Stage 1: Build ffmpeg (minimal audio conversion + poster extraction) ---
 # Must build on target platform since FFmpeg can't easily cross-compile
@@ -49,7 +49,7 @@ RUN mkdir -p /empty-tmp && chmod 1777 /empty-tmp
 RUN rm -rf ${PREFIX}/share ${PREFIX}/include ${PREFIX}/lib
 
 # --- Stage 2: Build Go server ---
-FROM --platform=${BUILDPLATFORM} golang:1.26.2-alpine3.22 AS go-builder
+FROM --platform=${BUILDPLATFORM} golang:1.26.3-alpine3.22 AS go-builder
 ARG TARGETPLATFORM
 ARG TARGETOS
 ARG TARGETARCH
