@@ -49,7 +49,7 @@ RUN mkdir -p /empty-tmp && chmod 1777 /empty-tmp
 RUN rm -rf ${PREFIX}/share ${PREFIX}/include ${PREFIX}/lib
 
 # --- Stage 2: Build Go server ---
-FROM --platform=${BUILDPLATFORM} golang:1.26.3-alpine3.22 AS go-builder
+FROM --platform=${BUILDPLATFORM} golang:1.26.4-alpine3.22 AS go-builder
 ARG TARGETPLATFORM
 ARG TARGETOS
 ARG TARGETARCH
