@@ -68,7 +68,7 @@ jobs:
           name: ffmpeg-source
 
       - name: Mount ccache sticky disk
-        uses: useblacksmith/stickydisk@v1.2.0
+        uses: useblacksmith/stickydisk@v1.3.0
         with:
           key: ccache-linux-amd64-${{ env.FFMPEG_VERSION }}
           path: ~/.ccache
@@ -134,7 +134,7 @@ jobs:
           name: ffmpeg-source
 
       - name: Mount ccache sticky disk
-        uses: useblacksmith/stickydisk@v1.2.0
+        uses: useblacksmith/stickydisk@v1.3.0
         with:
           key: ccache-linux-arm64-${{ env.FFMPEG_VERSION }}
           path: ~/.ccache
@@ -292,7 +292,7 @@ jobs:
           name: ffmpeg-source
 
       - name: Set up Docker Builder
-        uses: useblacksmith/setup-docker-builder@v1.8.0
+        uses: useblacksmith/setup-docker-builder@v1.9.0
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6.2.0
@@ -336,7 +336,7 @@ jobs:
           name: ffmpeg-source
 
       - name: Set up Docker Builder
-        uses: useblacksmith/setup-docker-builder@v1.8.0
+        uses: useblacksmith/setup-docker-builder@v1.9.0
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6.2.0
