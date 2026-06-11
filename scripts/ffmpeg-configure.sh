@@ -70,6 +70,10 @@ set -eu
     --enable-muxer=flac \
     --enable-muxer=image2pipe \
     \
+    --enable-muxer=mov \
+    --enable-muxer=matroska \
+    --enable-muxer=webm \
+    \
     --enable-filter=blackframe \
     --enable-filter=metadata \
     --enable-filter=format \
