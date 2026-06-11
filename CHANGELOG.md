@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.0](https://github.com/Fields-Education/audio-extractor/compare/v1.8.0...v1.9.0) (2026-06-11)
+
+
+### Features
+
+* add additional muxers to ffmpeg configuration ([#41](https://github.com/Fields-Education/audio-extractor/issues/41)) ([df46689](https://github.com/Fields-Education/audio-extractor/commit/df466899192c4bbcec340e6758a463ccabdb4e2c))
+
 ## [1.8.0](https://github.com/Fields-Education/audio-extractor/compare/v1.7.2...v1.8.0) (2026-06-11)
 
 
