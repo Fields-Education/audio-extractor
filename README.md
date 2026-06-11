@@ -24,6 +24,11 @@ curl -X POST "http://localhost:8080/convert?format=mp3&filters=7" \
 curl -X POST "http://localhost:8080/convert?format=poster" \
   --data-binary @input.mp4 \
   --output poster.jpg
+
+# Extract a 30 second MP3 segment starting at 90 seconds
+curl -X POST "http://localhost:8080/segment?start_sec=90&duration_sec=30" \
+  --data-binary @input.mp4 \
+  --output segment.mp3
 ```
 
 ## API
@@ -41,6 +46,21 @@ curl -X POST "http://localhost:8080/convert?format=poster" \
 - Channels: Mono
 - Bit depth: 16-bit (WAV/FLAC) or 128kbps (MP3)
 - Poster output: JPEG image from the first non-black video frame, scaled to 1280px wide
+
+### POST /segment
+
+Extract a time window from input media and convert it to Whisper-ready audio.
+
+**Query Parameters:**
+
+- `start_sec` - Start time in seconds (required, >= 0)
+- `duration_sec` - Segment duration in seconds (required, > 0)
+- `format` - Output format: `mp3` (default), `wav`, or `flac`
+- `filters` - Filter bitmask or keyword: `all`/`true` enables all filters (see Filter Bitmask below)
+
+**Output Specs:** Same as `/convert` audio output.
+
+**Performance Note:** `/segment` writes each request body to a temporary local file before invoking FFmpeg, so `start_sec` seeks against a seekable input file instead of `pipe:0`. This avoids pipe-based decode-from-byte-0 behavior for each seek point. Each `/segment` request still uploads the full request body; callers that need many windows from very large media should upload/store once and segment from that stored intermediate to avoid repeated network transfer.
 
 ### GET /health
 

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"os/exec"
@@ -87,6 +88,10 @@ func ffmpegLogLevel() string {
 // runFFmpegWithTempInput writes the input to a temp file and runs ffmpeg.
 // This is required for formats like MP4/MOV that need seeking to read metadata.
 func runFFmpegWithTempInput(r io.Reader, outputArgs []string) ([]byte, error) {
+	return runFFmpegWithTempInputArgs(r, nil, outputArgs)
+}
+
+func runFFmpegWithTempInputArgs(r io.Reader, inputArgs []string, outputArgs []string) ([]byte, error) {
 	// Create temp file for input
 	tmpFile, err := os.CreateTemp("", "audio-input-*")
 	if err != nil {
@@ -101,11 +106,13 @@ func runFFmpegWithTempInput(r io.Reader, outputArgs []string) ([]byte, error) {
 	}
 	_ = tmpFile.Close() // Close before ffmpeg reads it, ignore error
 
-	// Build ffmpeg args with file input instead of pipe
+	// Build ffmpeg args with file input instead of pipe. Segment seeks pass -ss
+	// before -i so ffmpeg can seek against this real file instead of pipe:0.
 	args := []string{
 		"-hide_banner", "-loglevel", ffmpegLogLevel(),
-		"-i", tmpFile.Name(),
 	}
+	args = append(args, inputArgs...)
+	args = append(args, "-i", tmpFile.Name())
 	args = append(args, outputArgs...)
 	args = append(args, "pipe:1")
 
@@ -129,6 +136,17 @@ func runFFmpegWithTempInput(r io.Reader, outputArgs []string) ([]byte, error) {
 	return stdout.Bytes(), nil
 }
 
+func segmentInputArgs(startSec float64) []string {
+	if startSec <= 0 {
+		return nil
+	}
+	return []string{"-ss", fmt.Sprintf("%.3f", startSec)}
+}
+
+func segmentDurationArgs(durationSec float64) []string {
+	return []string{"-t", fmt.Sprintf("%.3f", durationSec)}
+}
+
 func convertToWavPcm16WithCleanup(r io.Reader, filterMask int) ([]byte, error) {
 	var outputArgs []string
 
@@ -145,6 +163,24 @@ func convertToWavPcm16WithCleanup(r io.Reader, filterMask int) ([]byte, error) {
 	)
 
 	return runFFmpegWithTempInput(r, outputArgs)
+}
+
+func convertToWavPcm16SegmentWithCleanup(r io.Reader, filterMask int, startSec, durationSec float64) ([]byte, error) {
+	outputArgs := segmentDurationArgs(durationSec)
+
+	audioFilter := buildAudioFilter(filterMask)
+	if audioFilter != "" {
+		outputArgs = append(outputArgs, "-af", audioFilter)
+	}
+
+	outputArgs = append(outputArgs,
+		"-ac", "1",
+		"-ar", "16000",
+		"-f", "wav",
+		"-acodec", "pcm_s16le",
+	)
+
+	return runFFmpegWithTempInputArgs(r, segmentInputArgs(startSec), outputArgs)
 }
 
 func convertToMp3WithCleanup(r io.Reader, filterMask int) ([]byte, error) {
@@ -166,6 +202,25 @@ func convertToMp3WithCleanup(r io.Reader, filterMask int) ([]byte, error) {
 	return runFFmpegWithTempInput(r, outputArgs)
 }
 
+func convertToMp3SegmentWithCleanup(r io.Reader, filterMask int, startSec, durationSec float64) ([]byte, error) {
+	outputArgs := segmentDurationArgs(durationSec)
+
+	audioFilter := buildAudioFilter(filterMask)
+	if audioFilter != "" {
+		outputArgs = append(outputArgs, "-af", audioFilter)
+	}
+
+	outputArgs = append(outputArgs,
+		"-ac", "1",
+		"-ar", "16000",
+		"-f", "mp3",
+		"-acodec", "libmp3lame",
+		"-b:a", "128k",
+	)
+
+	return runFFmpegWithTempInputArgs(r, segmentInputArgs(startSec), outputArgs)
+}
+
 func convertToFlacWithCleanup(r io.Reader, filterMask int) ([]byte, error) {
 	var outputArgs []string
 
@@ -183,6 +238,25 @@ func convertToFlacWithCleanup(r io.Reader, filterMask int) ([]byte, error) {
 	)
 
 	return runFFmpegWithTempInput(r, outputArgs)
+}
+
+func convertToFlacSegmentWithCleanup(r io.Reader, filterMask int, startSec, durationSec float64) ([]byte, error) {
+	outputArgs := segmentDurationArgs(durationSec)
+
+	audioFilter := buildAudioFilter(filterMask)
+	if audioFilter != "" {
+		outputArgs = append(outputArgs, "-af", audioFilter)
+	}
+
+	outputArgs = append(outputArgs,
+		"-ac", "1",
+		"-ar", "16000",
+		"-f", "flac",
+		"-acodec", "flac",
+		"-compression_level", "5",
+	)
+
+	return runFFmpegWithTempInputArgs(r, segmentInputArgs(startSec), outputArgs)
 }
 
 func extractJpegPosterWithCleanup(r io.Reader) ([]byte, error) {
@@ -223,6 +297,22 @@ func parseFilterMask(filterParam string) int {
 
 	// Mask to valid filter bits to prevent overflow and invalid values
 	return mask & (FilterAll | FilterDenoiserSpeechMode)
+}
+
+func parseSegmentSeconds(param string) (float64, error) {
+	if param == "" {
+		return 0, fmt.Errorf("missing value")
+	}
+
+	value, err := strconv.ParseFloat(param, 64)
+	if err != nil {
+		return 0, err
+	}
+	if math.IsNaN(value) || math.IsInf(value, 0) {
+		return 0, fmt.Errorf("must be finite")
+	}
+
+	return value, nil
 }
 
 var maxUploadSize int64 = 250 << 20 // 250MB default
@@ -318,6 +408,66 @@ func convertHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func segmentHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, maxUploadSize)
+	defer func() { _ = r.Body.Close() }() // Explicitly ignore close error
+
+	startSec, err := parseSegmentSeconds(r.URL.Query().Get("start_sec"))
+	if err != nil || startSec < 0 {
+		http.Error(w, "invalid start_sec", http.StatusBadRequest)
+		return
+	}
+
+	durationSec, err := parseSegmentSeconds(r.URL.Query().Get("duration_sec"))
+	if err != nil || durationSec <= 0 {
+		http.Error(w, "invalid duration_sec", http.StatusBadRequest)
+		return
+	}
+
+	format := r.URL.Query().Get("format")
+	if format == "" {
+		format = "mp3"
+	}
+
+	filterMask := parseFilterMask(r.URL.Query().Get("filters"))
+
+	var data []byte
+	var contentType string
+
+	switch format {
+	case "wav":
+		data, err = convertToWavPcm16SegmentWithCleanup(r.Body, filterMask, startSec, durationSec)
+		contentType = "audio/wav"
+	case "mp3":
+		data, err = convertToMp3SegmentWithCleanup(r.Body, filterMask, startSec, durationSec)
+		contentType = "audio/mpeg"
+	case "flac":
+		data, err = convertToFlacSegmentWithCleanup(r.Body, filterMask, startSec, durationSec)
+		contentType = "audio/flac"
+	default:
+		http.Error(w, fmt.Sprintf("unsupported format: %s", format), http.StatusBadRequest)
+		return
+	}
+
+	if err != nil {
+		log.Printf("segment error for format %s: %v", format, err)
+		http.Error(w, "segment conversion failed", http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(http.StatusOK)
+	if _, err := w.Write(data); err != nil {
+		log.Printf("failed to write response: %v", err)
+	}
+}
+
 func healthHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -366,6 +516,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/convert", convertHandler)
+	mux.HandleFunc("/segment", segmentHandler)
 	mux.HandleFunc("/health", healthHandler)
 	srv := &http.Server{
 		Addr:              ":" + port,
