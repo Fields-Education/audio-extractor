@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.0](https://github.com/Fields-Education/audio-extractor/compare/v1.7.2...v1.8.0) (2026-06-11)
+
+
+### Features
+
+* add audio segmentation endpoint ([#39](https://github.com/Fields-Education/audio-extractor/issues/39)) ([9da3fb0](https://github.com/Fields-Education/audio-extractor/commit/9da3fb06d8fcfd3a4588253c0d706f84766196cd))
+
 ## [1.7.2](https://github.com/Fields-Education/audio-extractor/compare/v1.7.1...v1.7.2) (2026-05-06)
 
 
