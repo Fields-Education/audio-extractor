@@ -9,7 +9,7 @@ env:
   # renovate: datasource=github-releases depName=FFmpeg/FFmpeg extractVersion=^n(?<version>.*)$
   FFMPEG_VERSION: "8.0"
   # renovate: datasource=docker depName=golang
-  GO_VERSION: "1.26.5"
+  GO_VERSION: "1.27.1"
 
 permissions:
   contents: write
@@ -68,7 +68,7 @@ jobs:
           name: ffmpeg-source
 
       - name: Mount ccache sticky disk
-        uses: useblacksmith/stickydisk@v1.4.0
+        uses: useblacksmith/stickydisk@v1.6.0
         with:
           key: ccache-linux-amd64-${{ env.FFMPEG_VERSION }}
           path: ~/.ccache
@@ -134,7 +134,7 @@ jobs:
           name: ffmpeg-source
 
       - name: Mount ccache sticky disk
-        uses: useblacksmith/stickydisk@v1.4.0
+        uses: useblacksmith/stickydisk@v1.6.0
         with:
           key: ccache-linux-arm64-${{ env.FFMPEG_VERSION }}
           path: ~/.ccache
@@ -292,12 +292,12 @@ jobs:
           name: ffmpeg-source
 
       - name: Set up Docker Builder
-        uses: useblacksmith/setup-docker-builder@v2.0.0
+        uses: useblacksmith/setup-docker-builder@v2.2.0
         with:
           cache-key: Dockerfile
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v6.2.3
+        uses: aws-actions/configure-aws-credentials@v6.2.4
         with:
           role-to-assume: ${{ secrets.AWS_ECR_ROLE_ARN }}
           aws-region: us-east-1
@@ -307,7 +307,7 @@ jobs:
           aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws
 
       - name: Build and push Docker image
-        uses: useblacksmith/build-push-action@v2.2.0
+        uses: useblacksmith/build-push-action@v2.3.0
         with:
           context: .
           push: true
@@ -338,12 +338,12 @@ jobs:
           name: ffmpeg-source
 
       - name: Set up Docker Builder
-        uses: useblacksmith/setup-docker-builder@v2.0.0
+        uses: useblacksmith/setup-docker-builder@v2.2.0
         with:
           cache-key: Dockerfile
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v6.2.3
+        uses: aws-actions/configure-aws-credentials@v6.2.4
         with:
           role-to-assume: ${{ secrets.AWS_ECR_ROLE_ARN }}
           aws-region: us-east-1
@@ -353,7 +353,7 @@ jobs:
           aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws
 
       - name: Build and push Docker image
-        uses: useblacksmith/build-push-action@v2.2.0
+        uses: useblacksmith/build-push-action@v2.3.0
         with:
           context: .
           push: true
@@ -377,7 +377,7 @@ jobs:
       id-token: write
     steps:
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v6.2.3
+        uses: aws-actions/configure-aws-credentials@v6.2.4
         with:
           role-to-assume: ${{ secrets.AWS_ECR_ROLE_ARN }}
           aws-region: us-east-1
