@@ -429,7 +429,7 @@ Invalid values (including zero, negative values and values without a unit, like 
 
 - No built-in authentication - secure at the proxy level (nginx, traefik, etc.)
 - File size limits enforced (250MB default, configurable via MAX_UPLOAD_SIZE)
-- Processing timeouts prevent resource exhaustion
+- Processing timeouts prevent resource exhaustion, and ffmpeg is stopped as soon as the client disconnects
 - Temporary files are securely created and cleaned up
 - FFmpeg runs with minimal privileges in Docker (scratch image)
 

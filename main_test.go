@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -10,6 +12,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -20,7 +23,8 @@ var fakeFFmpegOutput = strings.Repeat("x", 8192)
 
 // installFakeFFmpeg points ffmpegPath at a script that records its args and
 // input size, checks the input is a real file, and prints fakeFFmpegOutput.
-// With FFMPEG_SLEEP set it sleeps that many seconds instead.
+// With FFMPEG_SLEEP set it sleeps that many seconds instead, first writing its
+// PID to FFMPEG_PID_FILE when that is set.
 // The returned functions read the args and input size from the last invocation.
 func installFakeFFmpeg(t *testing.T) (readArgs func() []string, readInputSize func() int) {
 	t.Helper()
@@ -49,6 +53,9 @@ if [ ! -f "$input" ]; then
 fi
 wc -c < "$input" > "$FFMPEG_INPUT_SIZE_FILE"
 if [ -n "$FFMPEG_SLEEP" ]; then
+	if [ -n "$FFMPEG_PID_FILE" ]; then
+		echo $$ > "$FFMPEG_PID_FILE"
+	fi
 	exec sleep "$FFMPEG_SLEEP"
 fi
 head -c ` + strconv.Itoa(len(fakeFFmpegOutput)) + ` /dev/zero | tr '\0' x
@@ -88,7 +95,7 @@ func TestSegmentConversionUsesSeekableInputFile(t *testing.T) {
 	readArgs, readInputSize := installFakeFFmpeg(t)
 
 	source := []byte("source media bytes")
-	data, err := convertAudioSegment(bytes.NewReader(source), "mp3", 0, defaultMP3Bitrate, 12.3456, 6.789)
+	data, err := convertAudioSegment(context.Background(), bytes.NewReader(source), "mp3", 0, defaultMP3Bitrate, 12.3456, 6.789)
 	if err != nil {
 		t.Fatalf("segment conversion failed: %v", err)
 	}
@@ -295,12 +302,76 @@ func TestFFmpegTimeoutStopsLongRuns(t *testing.T) {
 	t.Cleanup(func() { ffmpegTimeout = original })
 
 	start := time.Now()
-	if _, err := convertAudio(strings.NewReader("input"), "mp3", 0, defaultMP3Bitrate); err == nil {
+	if _, err := convertAudio(context.Background(), strings.NewReader("input"), "mp3", 0, defaultMP3Bitrate); err == nil {
 		t.Fatal("expected timeout error")
 	}
 	if elapsed := time.Since(start); elapsed > 10*time.Second {
 		t.Fatalf("ffmpeg ran for %s, want it stopped near %s", elapsed, ffmpegTimeout)
 	}
+}
+
+func TestClientDisconnectStopsFFmpeg(t *testing.T) {
+	installFakeFFmpeg(t)
+	pidPath := filepath.Join(t.TempDir(), "pid")
+	t.Setenv("FFMPEG_SLEEP", "30")
+	t.Setenv("FFMPEG_PID_FILE", pidPath)
+
+	handlerDone := make(chan struct{})
+	mux := http.NewServeMux()
+	mux.HandleFunc("/convert", func(w http.ResponseWriter, r *http.Request) {
+		defer close(handlerDone)
+		convertHandler(w, r)
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, srv.URL+"/convert?format=mp3", strings.NewReader("input"))
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	clientDone := make(chan error, 1)
+	go func() {
+		resp, err := http.DefaultClient.Do(req)
+		if err == nil {
+			_ = resp.Body.Close()
+		}
+		clientDone <- err
+	}()
+
+	pid := waitForPID(t, pidPath)
+	cancel() // Disconnect while ffmpeg is still running.
+	if err := <-clientDone; !errors.Is(err, context.Canceled) {
+		t.Fatalf("client error = %v, want context.Canceled", err)
+	}
+
+	select {
+	case <-handlerDone:
+	case <-time.After(5 * time.Second):
+		t.Fatal("handler still running 5s after the client disconnected")
+	}
+	// The handler returns only after exec reaps ffmpeg, so the PID must be gone.
+	if err := syscall.Kill(pid, 0); !errors.Is(err, syscall.ESRCH) {
+		t.Fatalf("ffmpeg pid %d still exists after disconnect (kill err %v)", pid, err)
+	}
+}
+
+func waitForPID(t *testing.T, path string) int {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if data, err := os.ReadFile(path); err == nil && len(bytes.TrimSpace(data)) > 0 {
+			pid, err := strconv.Atoi(strings.TrimSpace(string(data)))
+			if err != nil {
+				t.Fatalf("parse pid: %v", err)
+			}
+			return pid
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("fake ffmpeg never started")
+	return 0
 }
 
 func TestSuccessfulResponsesSetContentLength(t *testing.T) {
