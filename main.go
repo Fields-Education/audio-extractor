@@ -88,11 +88,15 @@ func ffmpegLogLevel() string {
 
 // runFFmpegWithTempInput writes the input to a temp file and runs ffmpeg.
 // This is required for formats like MP4/MOV that need seeking to read metadata.
-func runFFmpegWithTempInput(r io.Reader, outputArgs []string) ([]byte, error) {
-	return runFFmpegWithTempInputArgs(r, nil, outputArgs)
+//
+// ffmpeg is killed when ctx is done or after ffmpegTimeout. Handlers pass the
+// request context, so a client that disconnects stops its conversion instead
+// of leaving ffmpeg running for a response nobody can receive.
+func runFFmpegWithTempInput(ctx context.Context, r io.Reader, outputArgs []string) ([]byte, error) {
+	return runFFmpegWithTempInputArgs(ctx, r, nil, outputArgs)
 }
 
-func runFFmpegWithTempInputArgs(r io.Reader, inputArgs []string, outputArgs []string) ([]byte, error) {
+func runFFmpegWithTempInputArgs(ctx context.Context, r io.Reader, inputArgs []string, outputArgs []string) ([]byte, error) {
 	// Create temp file for input
 	tmpFile, err := os.CreateTemp("", "audio-input-*")
 	if err != nil {
@@ -118,16 +122,19 @@ func runFFmpegWithTempInputArgs(r io.Reader, inputArgs []string, outputArgs []st
 	args = append(args, "pipe:1")
 
 	// Add timeout to prevent hung ffmpeg processes
-	ctx, cancel := context.WithTimeout(context.Background(), ffmpegTimeout)
+	runCtx, cancel := context.WithTimeout(ctx, ffmpegTimeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, ffmpegPath, args...)
+	cmd := exec.CommandContext(runCtx, ffmpegPath, args...)
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
+		if ctx.Err() != nil {
+			return nil, fmt.Errorf("ffmpeg stopped, request ended: %w", ctx.Err())
+		}
 		log.Printf("ffmpeg stderr: %s", stderr.String())
 		return nil, fmt.Errorf("%v: %s", err, stderr.String())
 	}
@@ -207,16 +214,16 @@ func audioOutputArgs(format string, filterMask int, mp3Bitrate string) []string 
 	return args
 }
 
-func convertAudio(r io.Reader, format string, filterMask int, mp3Bitrate string) ([]byte, error) {
-	return runFFmpegWithTempInput(r, audioOutputArgs(format, filterMask, mp3Bitrate))
+func convertAudio(ctx context.Context, r io.Reader, format string, filterMask int, mp3Bitrate string) ([]byte, error) {
+	return runFFmpegWithTempInput(ctx, r, audioOutputArgs(format, filterMask, mp3Bitrate))
 }
 
-func convertAudioSegment(r io.Reader, format string, filterMask int, mp3Bitrate string, startSec, durationSec float64) ([]byte, error) {
+func convertAudioSegment(ctx context.Context, r io.Reader, format string, filterMask int, mp3Bitrate string, startSec, durationSec float64) ([]byte, error) {
 	outputArgs := append(segmentDurationArgs(durationSec), audioOutputArgs(format, filterMask, mp3Bitrate)...)
-	return runFFmpegWithTempInputArgs(r, segmentInputArgs(startSec), outputArgs)
+	return runFFmpegWithTempInputArgs(ctx, r, segmentInputArgs(startSec), outputArgs)
 }
 
-func extractJpegPosterWithCleanup(r io.Reader) ([]byte, error) {
+func extractJpegPosterWithCleanup(ctx context.Context, r io.Reader) ([]byte, error) {
 	outputArgs := []string{
 		"-map", "0:v:0",
 		"-frames:v", "1",
@@ -227,7 +234,7 @@ func extractJpegPosterWithCleanup(r io.Reader) ([]byte, error) {
 		"-q:v", "3",
 	}
 
-	data, err := runFFmpegWithTempInput(r, outputArgs)
+	data, err := runFFmpegWithTempInput(ctx, r, outputArgs)
 	if err != nil {
 		return nil, err
 	}
@@ -392,10 +399,10 @@ func convertHandler(w http.ResponseWriter, r *http.Request) {
 
 	switch format {
 	case "wav", "mp3", "flac":
-		data, err = convertAudio(r.Body, format, filterMask, mp3Bitrate)
+		data, err = convertAudio(r.Context(), r.Body, format, filterMask, mp3Bitrate)
 		contentType = audioContentTypes[format]
 	case "jpg", "jpeg", "poster":
-		data, err = extractJpegPosterWithCleanup(r.Body)
+		data, err = extractJpegPosterWithCleanup(r.Context(), r.Body)
 		contentType = "image/jpeg"
 	default:
 		http.Error(w, fmt.Sprintf("unsupported format: %s", format), http.StatusBadRequest)
@@ -451,7 +458,7 @@ func segmentHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data, err := convertAudioSegment(r.Body, format, filterMask, mp3Bitrate, startSec, durationSec)
+	data, err := convertAudioSegment(r.Context(), r.Body, format, filterMask, mp3Bitrate, startSec, durationSec)
 	if err != nil {
 		log.Printf("segment error for format %s: %v", format, err)
 		http.Error(w, "segment conversion failed", http.StatusBadRequest)
