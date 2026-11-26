@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -117,7 +118,7 @@ func runFFmpegWithTempInputArgs(r io.Reader, inputArgs []string, outputArgs []st
 	args = append(args, "pipe:1")
 
 	// Add timeout to prevent hung ffmpeg processes
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), ffmpegTimeout)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, ffmpegPath, args...)
@@ -147,115 +148,71 @@ func segmentDurationArgs(durationSec float64) []string {
 	return []string{"-t", fmt.Sprintf("%.3f", durationSec)}
 }
 
-func convertToWavPcm16WithCleanup(r io.Reader, filterMask int) ([]byte, error) {
-	var outputArgs []string
+const defaultMP3Bitrate = "128k"
 
-	audioFilter := buildAudioFilter(filterMask)
-	if audioFilter != "" {
-		outputArgs = append(outputArgs, "-af", audioFilter)
-	}
-
-	outputArgs = append(outputArgs,
-		"-ac", "1",
-		"-ar", "16000",
-		"-f", "wav",
-		"-acodec", "pcm_s16le",
-	)
-
-	return runFFmpegWithTempInput(r, outputArgs)
+// validMP3Bitrates lists the bitrates LAME supports for 16 kHz mono output
+// (MPEG-2 Layer III). Callers pass them with a "k" suffix, matching ffmpeg's
+// -b:a syntax.
+var validMP3Bitrates = []string{
+	"8k", "16k", "24k", "32k", "40k", "48k", "56k", "64k",
+	"80k", "96k", "112k", "128k", "144k", "160k",
 }
 
-func convertToWavPcm16SegmentWithCleanup(r io.Reader, filterMask int, startSec, durationSec float64) ([]byte, error) {
-	outputArgs := segmentDurationArgs(durationSec)
-
-	audioFilter := buildAudioFilter(filterMask)
-	if audioFilter != "" {
-		outputArgs = append(outputArgs, "-af", audioFilter)
-	}
-
-	outputArgs = append(outputArgs,
-		"-ac", "1",
-		"-ar", "16000",
-		"-f", "wav",
-		"-acodec", "pcm_s16le",
-	)
-
-	return runFFmpegWithTempInputArgs(r, segmentInputArgs(startSec), outputArgs)
+// audioContentTypes maps each audio output format to its response Content-Type.
+var audioContentTypes = map[string]string{
+	"wav":  "audio/wav",
+	"mp3":  "audio/mpeg",
+	"flac": "audio/flac",
 }
 
-func convertToMp3WithCleanup(r io.Reader, filterMask int) ([]byte, error) {
-	var outputArgs []string
+// audioOutputArgs builds the ffmpeg output args for a 16 kHz mono audio format.
+//
+// Audio outputs drop video, subtitle and data streams so cover art (often PNG)
+// and chapter text tracks in MP4/M4A/M4B inputs are not auto-mapped into
+// muxers that accept attached pictures (MP3, FLAC); our minimal ffmpeg build
+// has no PNG encoder. Chapters and global metadata are stripped too, and MP3
+// output skips the ID3v2 tag, so an MP3 starts directly with audio frames and
+// can be sliced by byte range.
+func audioOutputArgs(format string, filterMask int, mp3Bitrate string) []string {
+	var args []string
 
-	audioFilter := buildAudioFilter(filterMask)
-	if audioFilter != "" {
-		outputArgs = append(outputArgs, "-af", audioFilter)
+	if audioFilter := buildAudioFilter(filterMask); audioFilter != "" {
+		args = append(args, "-af", audioFilter)
 	}
 
-	outputArgs = append(outputArgs,
+	args = append(args,
+		"-vn", "-sn", "-dn",
+		"-map_chapters", "-1",
+		"-map_metadata", "-1",
 		"-ac", "1",
 		"-ar", "16000",
-		"-f", "mp3",
-		"-acodec", "libmp3lame",
-		"-b:a", "128k",
 	)
 
-	return runFFmpegWithTempInput(r, outputArgs)
+	switch format {
+	case "wav":
+		args = append(args, "-f", "wav", "-acodec", "pcm_s16le")
+	case "mp3":
+		args = append(args,
+			"-f", "mp3",
+			"-acodec", "libmp3lame",
+			"-b:a", mp3Bitrate,
+			"-id3v2_version", "0",
+		)
+	case "flac":
+		// Pin 16-bit samples: float decoders (AAC, MP3, Opus) would otherwise
+		// make the flac encoder pick s32 and write 24-bit output.
+		args = append(args, "-f", "flac", "-acodec", "flac", "-sample_fmt", "s16", "-compression_level", "5")
+	}
+
+	return args
 }
 
-func convertToMp3SegmentWithCleanup(r io.Reader, filterMask int, startSec, durationSec float64) ([]byte, error) {
-	outputArgs := segmentDurationArgs(durationSec)
-
-	audioFilter := buildAudioFilter(filterMask)
-	if audioFilter != "" {
-		outputArgs = append(outputArgs, "-af", audioFilter)
-	}
-
-	outputArgs = append(outputArgs,
-		"-ac", "1",
-		"-ar", "16000",
-		"-f", "mp3",
-		"-acodec", "libmp3lame",
-		"-b:a", "128k",
-	)
-
-	return runFFmpegWithTempInputArgs(r, segmentInputArgs(startSec), outputArgs)
+func convertAudio(r io.Reader, format string, filterMask int, mp3Bitrate string) ([]byte, error) {
+	return runFFmpegWithTempInput(r, audioOutputArgs(format, filterMask, mp3Bitrate))
 }
 
-func convertToFlacWithCleanup(r io.Reader, filterMask int) ([]byte, error) {
-	var outputArgs []string
-
-	audioFilter := buildAudioFilter(filterMask)
-	if audioFilter != "" {
-		outputArgs = append(outputArgs, "-af", audioFilter)
-	}
-
-	outputArgs = append(outputArgs,
-		"-ac", "1",
-		"-ar", "16000",
-		"-f", "flac",
-		"-acodec", "flac",
-		"-compression_level", "5",
-	)
-
-	return runFFmpegWithTempInput(r, outputArgs)
-}
-
-func convertToFlacSegmentWithCleanup(r io.Reader, filterMask int, startSec, durationSec float64) ([]byte, error) {
-	outputArgs := segmentDurationArgs(durationSec)
-
-	audioFilter := buildAudioFilter(filterMask)
-	if audioFilter != "" {
-		outputArgs = append(outputArgs, "-af", audioFilter)
-	}
-
-	outputArgs = append(outputArgs,
-		"-ac", "1",
-		"-ar", "16000",
-		"-f", "flac",
-		"-acodec", "flac",
-		"-compression_level", "5",
-	)
-
+func convertAudioSegment(r io.Reader, format string, filterMask int, mp3Bitrate string, startSec, durationSec float64) ([]byte, error) {
+	outputArgs := append(segmentDurationArgs(durationSec), audioOutputArgs(format, filterMask, mp3Bitrate)...)
 	return runFFmpegWithTempInputArgs(r, segmentInputArgs(startSec), outputArgs)
 }
 
@@ -315,7 +272,59 @@ func parseSegmentSeconds(param string) (float64, error) {
 	return value, nil
 }
 
+// parseMP3Bitrate validates the bitrate query param for MP3 output. An empty
+// param means the default. Other formats ignore the param entirely, so a stray
+// value never fails a WAV, FLAC or poster request.
+func parseMP3Bitrate(format, param string) (string, error) {
+	if format != "mp3" || param == "" {
+		return defaultMP3Bitrate, nil
+	}
+	if !slices.Contains(validMP3Bitrates, param) {
+		return "", fmt.Errorf("unsupported bitrate %q", param)
+	}
+	return param, nil
+}
+
+// writeBufferedResponse writes a fully buffered body with an explicit
+// Content-Length so large outputs are not sent chunked; consumers such as R2
+// uploads need a stream of known length.
+func writeBufferedResponse(w http.ResponseWriter, contentType string, data []byte) {
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(http.StatusOK)
+	if _, err := w.Write(data); err != nil {
+		log.Printf("failed to write response: %v", err)
+	}
+}
+
 var maxUploadSize int64 = 250 << 20 // 250MB default
+
+const defaultTimeout = 5 * time.Minute
+
+// ffmpegTimeout bounds each ffmpeg run. FFMPEG_TIMEOUT overrides it for long
+// inputs such as multi-hour audiobooks.
+var ffmpegTimeout = defaultTimeout
+
+// durationFromEnv reads a positive Go duration (e.g. "45m") from the named
+// environment variable. Unset returns def; an invalid value logs a warning and
+// returns def.
+func durationFromEnv(name string, def time.Duration) time.Duration {
+	raw := os.Getenv(name)
+	if raw == "" {
+		return def
+	}
+
+	d, err := time.ParseDuration(strings.TrimSpace(raw))
+	if err == nil && d <= 0 {
+		err = fmt.Errorf("must be positive")
+	}
+	if err != nil {
+		log.Printf("warning: invalid %s '%s', using default %s: %v", name, raw, def, err)
+		return def
+	}
+	return d
+}
 
 // parseByteSize parses strings like "250MB", "1GB", "500" (bytes)
 func parseByteSize(s string) (int64, error) {
@@ -372,20 +381,19 @@ func convertHandler(w http.ResponseWriter, r *http.Request) {
 
 	filterMask := parseFilterMask(r.URL.Query().Get("filters"))
 
+	mp3Bitrate, err := parseMP3Bitrate(format, r.URL.Query().Get("bitrate"))
+	if err != nil {
+		http.Error(w, "invalid bitrate", http.StatusBadRequest)
+		return
+	}
+
 	var data []byte
-	var err error
 	var contentType string
 
 	switch format {
-	case "wav":
-		data, err = convertToWavPcm16WithCleanup(r.Body, filterMask)
-		contentType = "audio/wav"
-	case "mp3":
-		data, err = convertToMp3WithCleanup(r.Body, filterMask)
-		contentType = "audio/mpeg"
-	case "flac":
-		data, err = convertToFlacWithCleanup(r.Body, filterMask)
-		contentType = "audio/flac"
+	case "wav", "mp3", "flac":
+		data, err = convertAudio(r.Body, format, filterMask, mp3Bitrate)
+		contentType = audioContentTypes[format]
 	case "jpg", "jpeg", "poster":
 		data, err = extractJpegPosterWithCleanup(r.Body)
 		contentType = "image/jpeg"
@@ -400,12 +408,7 @@ func convertHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", contentType)
-	w.Header().Set("Cache-Control", "no-store")
-	w.WriteHeader(http.StatusOK)
-	if _, err := w.Write(data); err != nil {
-		log.Printf("failed to write response: %v", err)
-	}
+	writeBufferedResponse(w, contentType, data)
 }
 
 func segmentHandler(w http.ResponseWriter, r *http.Request) {
@@ -436,36 +439,26 @@ func segmentHandler(w http.ResponseWriter, r *http.Request) {
 
 	filterMask := parseFilterMask(r.URL.Query().Get("filters"))
 
-	var data []byte
-	var contentType string
+	mp3Bitrate, err := parseMP3Bitrate(format, r.URL.Query().Get("bitrate"))
+	if err != nil {
+		http.Error(w, "invalid bitrate", http.StatusBadRequest)
+		return
+	}
 
-	switch format {
-	case "wav":
-		data, err = convertToWavPcm16SegmentWithCleanup(r.Body, filterMask, startSec, durationSec)
-		contentType = "audio/wav"
-	case "mp3":
-		data, err = convertToMp3SegmentWithCleanup(r.Body, filterMask, startSec, durationSec)
-		contentType = "audio/mpeg"
-	case "flac":
-		data, err = convertToFlacSegmentWithCleanup(r.Body, filterMask, startSec, durationSec)
-		contentType = "audio/flac"
-	default:
+	contentType, ok := audioContentTypes[format]
+	if !ok {
 		http.Error(w, fmt.Sprintf("unsupported format: %s", format), http.StatusBadRequest)
 		return
 	}
 
+	data, err := convertAudioSegment(r.Body, format, filterMask, mp3Bitrate, startSec, durationSec)
 	if err != nil {
 		log.Printf("segment error for format %s: %v", format, err)
 		http.Error(w, "segment conversion failed", http.StatusBadRequest)
 		return
 	}
 
-	w.Header().Set("Content-Type", contentType)
-	w.Header().Set("Cache-Control", "no-store")
-	w.WriteHeader(http.StatusOK)
-	if _, err := w.Write(data); err != nil {
-		log.Printf("failed to write response: %v", err)
-	}
+	writeBufferedResponse(w, contentType, data)
 }
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {
@@ -514,6 +507,10 @@ func main() {
 		}
 	}
 
+	ffmpegTimeout = durationFromEnv("FFMPEG_TIMEOUT", defaultTimeout)
+	httpReadTimeout := durationFromEnv("HTTP_READ_TIMEOUT", defaultTimeout)
+	httpWriteTimeout := durationFromEnv("HTTP_WRITE_TIMEOUT", defaultTimeout)
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/convert", convertHandler)
 	mux.HandleFunc("/segment", segmentHandler)
@@ -522,13 +519,14 @@ func main() {
 		Addr:              ":" + port,
 		Handler:           mux,
 		ReadHeaderTimeout: 15 * time.Second,
-		ReadTimeout:       5 * time.Minute,
-		WriteTimeout:      5 * time.Minute,
+		ReadTimeout:       httpReadTimeout,
+		WriteTimeout:      httpWriteTimeout,
 		IdleTimeout:       120 * time.Second,
 	}
 	if verbose {
 		log.Printf("verbose logging enabled")
 		log.Printf("max upload size: %d MB", maxUploadSize/(1<<20))
+		log.Printf("timeouts: ffmpeg %s, http read %s, http write %s", ffmpegTimeout, httpReadTimeout, httpWriteTimeout)
 	}
 	log.Printf("audio-extractor %s listening on :%s", version, port)
 	log.Fatal(srv.ListenAndServe())
