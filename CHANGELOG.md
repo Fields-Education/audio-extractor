@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.10.0](https://github.com/Fields-Education/audio-extractor/compare/v1.9.0...v1.10.0) (2026-11-26)
+
+
+### Features
+
+* add bitrate query param for MP3 output ([0528116](https://github.com/Fields-Education/audio-extractor/commit/05281166cbc4990de015fcb4cc1f62a217e38520))
+* make ffmpeg and HTTP timeouts configurable via environment ([0528116](https://github.com/Fields-Education/audio-extractor/commit/05281166cbc4990de015fcb4cc1f62a217e38520))
+* set Content-Length on successful /convert and /segment responses ([0528116](https://github.com/Fields-Education/audio-extractor/commit/05281166cbc4990de015fcb4cc1f62a217e38520))
+
+
+### Bug Fixes
+
+* convert audiobooks and other inputs with embedded cover art ([#52](https://github.com/Fields-Education/audio-extractor/issues/52)) ([0528116](https://github.com/Fields-Education/audio-extractor/commit/05281166cbc4990de015fcb4cc1f62a217e38520))
+* encode FLAC output as 16-bit for float-decoded inputs ([0528116](https://github.com/Fields-Education/audio-extractor/commit/05281166cbc4990de015fcb4cc1f62a217e38520))
+* stop ffmpeg when the client disconnects ([#54](https://github.com/Fields-Education/audio-extractor/issues/54)) ([1b8cacb](https://github.com/Fields-Education/audio-extractor/commit/1b8cacbd06f668c65d78c84ea52d9b810de4cb92))
+* use an existing golang base image tag in the Dockerfile ([0528116](https://github.com/Fields-Education/audio-extractor/commit/05281166cbc4990de015fcb4cc1f62a217e38520))
+
 ## [1.9.0](https://github.com/Fields-Education/audio-extractor/compare/v1.8.0...v1.9.0) (2026-06-11)
 
 
