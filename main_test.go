@@ -312,48 +312,60 @@ func TestFFmpegTimeoutStopsLongRuns(t *testing.T) {
 
 func TestClientDisconnectStopsFFmpeg(t *testing.T) {
 	installFakeFFmpeg(t)
-	pidPath := filepath.Join(t.TempDir(), "pid")
-	t.Setenv("FFMPEG_SLEEP", "30")
-	t.Setenv("FFMPEG_PID_FILE", pidPath)
+	// Short enough that a regression fails fast; srv.Close waits for the handler.
+	t.Setenv("FFMPEG_SLEEP", "15")
 
-	handlerDone := make(chan struct{})
-	mux := http.NewServeMux()
-	mux.HandleFunc("/convert", func(w http.ResponseWriter, r *http.Request) {
-		defer close(handlerDone)
-		convertHandler(w, r)
-	})
-	srv := httptest.NewServer(mux)
-	t.Cleanup(srv.Close)
+	for _, target := range []string{
+		"/convert?format=mp3",
+		"/convert?format=poster",
+		"/segment?start_sec=0&duration_sec=5",
+	} {
+		t.Run(target, func(t *testing.T) {
+			pidPath := filepath.Join(t.TempDir(), "pid")
+			t.Setenv("FFMPEG_PID_FILE", pidPath)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, srv.URL+"/convert?format=mp3", strings.NewReader("input"))
-	if err != nil {
-		t.Fatalf("new request: %v", err)
-	}
-	clientDone := make(chan error, 1)
-	go func() {
-		resp, err := http.DefaultClient.Do(req)
-		if err == nil {
-			_ = resp.Body.Close()
-		}
-		clientDone <- err
-	}()
+			handlerDone := make(chan struct{})
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				defer close(handlerDone)
+				if r.URL.Path == "/segment" {
+					segmentHandler(w, r)
+				} else {
+					convertHandler(w, r)
+				}
+			}))
+			t.Cleanup(srv.Close)
 
-	pid := waitForPID(t, pidPath)
-	cancel() // Disconnect while ffmpeg is still running.
-	if err := <-clientDone; !errors.Is(err, context.Canceled) {
-		t.Fatalf("client error = %v, want context.Canceled", err)
-	}
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			req, err := http.NewRequestWithContext(ctx, http.MethodPost, srv.URL+target, strings.NewReader("input"))
+			if err != nil {
+				t.Fatalf("new request: %v", err)
+			}
+			clientDone := make(chan error, 1)
+			go func() {
+				resp, err := http.DefaultClient.Do(req)
+				if err == nil {
+					_ = resp.Body.Close()
+				}
+				clientDone <- err
+			}()
 
-	select {
-	case <-handlerDone:
-	case <-time.After(5 * time.Second):
-		t.Fatal("handler still running 5s after the client disconnected")
-	}
-	// The handler returns only after exec reaps ffmpeg, so the PID must be gone.
-	if err := syscall.Kill(pid, 0); !errors.Is(err, syscall.ESRCH) {
-		t.Fatalf("ffmpeg pid %d still exists after disconnect (kill err %v)", pid, err)
+			pid := waitForPID(t, pidPath)
+			cancel() // Disconnect while ffmpeg is still running.
+			if err := <-clientDone; !errors.Is(err, context.Canceled) {
+				t.Fatalf("client error = %v, want context.Canceled", err)
+			}
+
+			select {
+			case <-handlerDone:
+			case <-time.After(5 * time.Second):
+				t.Fatal("handler still running 5s after the client disconnected")
+			}
+			// The handler returns only after exec reaps ffmpeg, so the PID must be gone.
+			if err := syscall.Kill(pid, 0); !errors.Is(err, syscall.ESRCH) {
+				t.Fatalf("ffmpeg pid %d still exists after disconnect (kill err %v)", pid, err)
+			}
+		})
 	}
 }
 
