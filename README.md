@@ -29,6 +29,11 @@ curl -X POST "http://localhost:8080/convert?format=poster" \
 curl -X POST "http://localhost:8080/segment?start_sec=90&duration_sec=30" \
   --data-binary @input.mp4 \
   --output segment.mp3
+
+# Convert an audiobook (M4B with cover art and chapters) to a compact 32 kbps MP3
+curl -X POST "http://localhost:8080/convert?format=mp3&bitrate=32k" \
+  --data-binary @book.m4b \
+  --output book.mp3
 ```
 
 ## API
@@ -39,13 +44,18 @@ curl -X POST "http://localhost:8080/segment?start_sec=90&duration_sec=30" \
 
 - `format` - Output format: `wav` (default), `mp3`, `flac`, or `poster`/`jpg`/`jpeg`
 - `filters` - Filter bitmask or keyword: `all`/`true` enables all filters (see Filter Bitmask below)
+- `bitrate` - MP3 bitrate (see MP3 Bitrate below). Default `128k`. Ignored for other formats.
 
 **Output Specs:**
 
 - Sample rate: 16000 Hz
 - Channels: Mono
-- Bit depth: 16-bit (WAV/FLAC) or 128kbps (MP3)
+- Bit depth: 16-bit (WAV/FLAC) or constant bitrate (MP3, 128 kbps by default)
 - Poster output: JPEG image from the first non-black video frame, scaled to 1280px wide
+
+**Audio outputs contain one audio stream and nothing else.** Video, subtitle and data streams are dropped, so cover art, per-chapter images and chapter text tracks in MP4/M4A/M4B/MOV inputs no longer reach the output. Chapters and source metadata are stripped as well. MP3 output has no ID3 tag, so the file begins directly with MPEG audio frames, and every frame of a constant-bitrate MP3 has the same size. Byte-range slices on frame boundaries decode on their own, but LAME's bit reservoir lets a frame borrow data from earlier frames, so the first few frames of a slice (36 ms each at 16 kHz) can decode as silence or glitches. Callers that need clean boundaries should overlap slices and decode with some preroll.
+
+**Responses:** Successful responses are fully buffered and carry `Content-Length` rather than chunked transfer encoding, so consumers can stream them into stores that need a known length (for example Cloudflare R2 `put`).
 
 ### POST /segment
 
@@ -57,10 +67,19 @@ Extract a time window from input media and convert it to Whisper-ready audio.
 - `duration_sec` - Segment duration in seconds (required, > 0)
 - `format` - Output format: `mp3` (default), `wav`, or `flac`
 - `filters` - Filter bitmask or keyword: `all`/`true` enables all filters (see Filter Bitmask below)
+- `bitrate` - MP3 bitrate (see MP3 Bitrate below). Default `128k`. Ignored for other formats.
 
-**Output Specs:** Same as `/convert` audio output.
+**Output Specs:** Same as `/convert` audio output, including stream and metadata stripping and `Content-Length`.
 
 **Performance Note:** `/segment` writes each request body to a temporary local file before invoking FFmpeg, so `start_sec` seeks against a seekable input file instead of `pipe:0`. This avoids pipe-based decode-from-byte-0 behavior for each seek point. Each `/segment` request still uploads the full request body; callers that need many windows from very large media should upload/store once and segment from that stored intermediate to avoid repeated network transfer.
+
+### MP3 Bitrate
+
+MP3 output is 16 kHz mono MPEG-2 Layer III, which LAME supports at these constant bitrates. Pass the value with a lowercase `k` suffix. Omitting `bitrate` or leaving it empty uses `128k`; any value not listed below (including `32` or `32000`) returns `400 invalid bitrate` for MP3 output.
+
+`8k`, `16k`, `24k`, `32k`, `40k`, `48k`, `56k`, `64k`, `80k`, `96k`, `112k`, `128k` (default), `144k`, `160k`
+
+Speech sources such as LibriVox audiobooks (AAC at 64 kbps or less) transcribe well at `32k`, a quarter of the default output size.
 
 ### GET /health
 
@@ -330,7 +349,7 @@ async function convertAudio(file: File, filters: number = 0): Promise<Blob> {
 
 - MP3, AAC, OGG (Vorbis, Opus)
 - FLAC, WAV (PCM)
-- MP4/M4A/MOV, WebM, Matroska (MKV)
+- MP4/M4A/M4B/MOV, WebM, Matroska (MKV), including files with embedded cover art and chapters
 
 ## Performance
 
@@ -392,12 +411,17 @@ docker run -d -p 8080:8080 -e MAX_UPLOAD_SIZE=1GB ffmpeg-audio-extractor
 | `PORT` | HTTP server port | `8080` |
 | `VERBOSE` | Enable verbose logging (`true` or `1`) | `false` |
 | `MAX_UPLOAD_SIZE` | Maximum upload size (e.g., `250MB`, `1GB`, `524288000`) | `250MB` |
+| `FFMPEG_TIMEOUT` | Maximum time for one ffmpeg run, as a Go duration (e.g., `45m`, `1h30m`) | `5m` |
+| `HTTP_READ_TIMEOUT` | Maximum time to read a whole request, including the upload body (Go duration) | `5m` |
+| `HTTP_WRITE_TIMEOUT` | Maximum time from the end of the request headers to the end of the response, so it covers the upload, ffmpeg and the response (Go duration) | `5m` |
+
+Invalid values (including zero, negative values and values without a unit, like `45`) are logged at startup and the default is used.
 
 ### Limits
 
-- **Maximum upload size:** 250MB (configurable via `MAX_UPLOAD_SIZE`)
-- **Processing timeout:** 5 minutes
-- **Supported formats:** MP3, AAC, OGG, FLAC, WAV, MP4/M4A, WebM, MKV
+- **Maximum upload size:** 250MB (configurable via `MAX_UPLOAD_SIZE`). Large audiobook inputs can reach about 400MB; raise the limit for those deployments, e.g. `MAX_UPLOAD_SIZE=512MB`.
+- **Timeouts:** 5 minutes for ffmpeg, request reads and response writes (configurable via `FFMPEG_TIMEOUT`, `HTTP_READ_TIMEOUT`, `HTTP_WRITE_TIMEOUT`). Long audiobooks can exceed this on slower CPUs; raise all three together, keeping `HTTP_WRITE_TIMEOUT` at least as long as the upload, `FFMPEG_TIMEOUT` and the response transfer combined.
+- **Supported formats:** MP3, AAC, OGG, FLAC, WAV, MP4/M4A/M4B, WebM, MKV
 
 ## Security Considerations
 
